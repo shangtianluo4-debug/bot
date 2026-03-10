@@ -6,191 +6,134 @@ import os
 import json
 import datetime
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-
-client = OpenAI(api_key=OPENAI_KEY)
-
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
+# -------------------------------
+# 初始化
+# -------------------------------
+intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-DATA_FILE = "data.json"
+# OpenAI Client
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_api_key)
 
-# ------------------
-# 資料
-# ------------------
-
-if os.path.exists(DATA_FILE):
-    with open(DATA_FILE) as f:
+# 載入黑白名單資料
+if os.path.exists("data.json"):
+    with open("data.json", "r") as f:
         data = json.load(f)
 else:
-    data = {
-        "blacklist": [],
-        "whitelist": [],
-        "warnings": {},
-        "log_channel": None
-    }
+    data = {"whitelist": [], "blacklist": [], "violations": {}}
 
-def save():
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+# 詐騙字詞清單
+scam_words = ["discord.gift/", "nitro", "free money", "bit.ly/"]
 
-# -----------------------------
+# -------------------------------
 # /say 指令
-# -----------------------------
-discord.Intents.all())
+# -------------------------------
+@bot.tree.command(name="say", description="機器人代替你發訊息")
+@app_commands.describe(message="你想讓機器人說的內容")
+async def say(interaction: Interaction, message: str):
+    await interaction.response.send_message("訊息已發送！", ephemeral=True)
+    await interaction.channel.send(message)
 
-# -----------------------------
-# /say 斜線指令
-# -----------------------------
-class Say(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+# -------------------------------
+# 黑白名單管理指令
+# -------------------------------
+@bot.tree.command(name="whitelist", description="管理白名單")
+@app_commands.describe(action="add 或 remove", member="要操作的使用者")
+async def whitelist(interaction: Interaction, action: str, member: discord.Member):
+    user_id = member.id
+    if action.lower() == "add":
+        if user_id not in data["whitelist"]:
+            data["whitelist"].append(user_id)
+            # 移除黑名單
+            if user_id in data["blacklist"]:
+                data["blacklist"].remove(user_id)
+            await interaction.response.send_message(f"{member} 已加入白名單", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"{member} 已經在白名單", ephemeral=True)
+    elif action.lower() == "remove":
+        if user_id in data["whitelist"]:
+            data["whitelist"].remove(user_id)
+            await interaction.response.send_message(f"{member} 已從白名單移除", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"{member} 不在白名單", ephemeral=True)
+    else:
+        await interaction.response.send_message("action 只能是 add 或 remove", ephemeral=True)
 
-    @app_commands.command(
-        name="say", 
-        description="機器人代替你發訊息"
-    )
-    @app_commands.describe(
-        message="你想讓機器人說的內容"
-    )
-    async def say(self, interaction: Interaction, message: str):
-        # 立刻回應使用者，但隱藏給其他人看
-        await interaction.response.send_message("訊息已發送！", ephemeral=True)
-        
-        # 由 Bot 自己發訊息到同一個頻道
-        await interaction.channel.send(message)
+    # 存檔
+    with open("data.json", "w") as f:
+        json.dump(data, f, indent=4)
 
-# 在 class 定義後再加
-bot.add_cog(Say(bot))
-# ------------------
-# Bot啟動
-# ------------------
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f"Bot 已啟動: {bot.user}")
-# ------------------
-# 設置log頻道
-# ------------------
+@bot.tree.command(name="blacklist", description="管理黑名單")
+@app_commands.describe(action="add 或 remove", member="要操作的使用者")
+async def blacklist(interaction: Interaction, action: str, member: discord.Member):
+    user_id = member.id
+    if action.lower() == "add":
+        if user_id not in data["blacklist"]:
+            data["blacklist"].append(user_id)
+            # 移除白名單
+            if user_id in data["whitelist"]:
+                data["whitelist"].remove(user_id)
+            await interaction.response.send_message(f"{member} 已加入黑名單", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"{member} 已經在黑名單", ephemeral=True)
+    elif action.lower() == "remove":
+        if user_id in data["blacklist"]:
+            data["blacklist"].remove(user_id)
+            await interaction.response.send_message(f"{member} 已從黑名單移除", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"{member} 不在黑名單", ephemeral=True)
+    else:
+        await interaction.response.send_message("action 只能是 add 或 remove", ephemeral=True)
 
-@bot.tree.command(name="setlog",description="設置違規懲罰訊息頻道")
-async def setlog(interaction: discord.Interaction, channel: discord.TextChannel):
+    # 存檔
+    with open("data.json", "w") as f:
+        json.dump(data, f, indent=4)
 
-    data["log_channel"] = channel.id
-    save()
-
-    await interaction.response.send_message("懲罰頻道設定成功")
-
-# ------------------
-# 黑名單
-# ------------------
-
-@bot.tree.command(name="blacklist",description="將成員加入黑名單")
-async def blacklist(interaction: discord.Interaction, member: discord.Member):
-
-    role = discord.utils.get(interaction.guild.roles, name="Blacklisted")
-
-    if not role:
-        role = await interaction.guild.create_role(name="Blacklisted")
-
-        for channel in interaction.guild.channels:
-            await channel.set_permissions(role, view_channel=False)
-
-    await member.add_roles(role)
-
-    data["blacklist"].append(member.id)
-    save()
-
-    await interaction.response.send_message("已加入黑名單")
-
-# ------------------
-# 白名單
-# ------------------
-
-@bot.tree.command(name="whitelist",description="將成員加入白名單")
-async def whitelist(interaction: discord.Interaction, member: discord.Member):
-
-    data["whitelist"].append(member.id)
-    save()
-
-    await interaction.response.send_message("已加入白名單")
-
-# ------------------
-# 詐騙關鍵字
-# ------------------
-
-scam_words = [
-    "free nitro",
-    "discord nitro",
-    "steam giveaway",
-    "bit.ly",
-    "grabify",
-    "airdrop"
-]
-
-# ------------------
-# 違規處理
-# ------------------
-
+# -------------------------------
+# 懲罰功能
+# -------------------------------
 async def punish(member, guild, reason):
+    user_id = str(member.id)
+    data["violations"][user_id] = data["violations"].get(user_id, 0) + 1
 
-    uid = str(member.id)
+    # 違規達 7 次自動加入黑名單
+    if data["violations"][user_id] >= 7:
+        if member.id not in data["blacklist"]:
+            data["blacklist"].append(member.id)
 
-    if uid not in data["warnings"]:
-        data["warnings"][uid] = 0
+    # 儲存
+    with open("data.json", "w") as f:
+        json.dump(data, f, indent=4)
 
-    data["warnings"][uid] += 1
-    warn = data["warnings"][uid]
+    punish_channel = discord.utils.get(guild.text_channels, name="懲罰通知")
+    if punish_channel:
+        await punish_channel.send(f"{member.mention} 違規: {reason} (第 {data['violations'][user_id]} 次)")
 
-    save()
+    try:
+        await member.edit(timed_out_until=datetime.datetime.utcnow() + datetime.timedelta(minutes=5))
+    except:
+        pass
 
-    log_channel = None
-
-    if data["log_channel"]:
-        log_channel = bot.get_channel(data["log_channel"])
-
-    # 3次禁言
-    if warn == 3:
-        await member.timeout(datetime.timedelta(minutes=10))
-
-    # 5次禁言
-    if warn == 5:
-        await member.timeout(datetime.timedelta(hours=1))
-
-    # 7次黑名單
-    if warn >= 7:
-
-        role = discord.utils.get(guild.roles, name="Blacklisted")
-
-        if not role:
-            role = await guild.create_role(name="Blacklisted")
-
-            for channel in guild.channels:
-                await channel.set_permissions(role, view_channel=False)
-
-        await member.add_roles(role)
-
-        data["blacklist"].append(member.id)
-        save()
-
-    if log_channel:
-        await log_channel.send(
-            f"{member} 違規\n原因: {reason}\n違規次數: {warn}"
-        )
-
+# -------------------------------
+# 訊息監控
+# -------------------------------
 @bot.event
 async def on_message(message):
-
     if message.author.bot:
         return
 
     # 白名單無敵
     if message.author.id in data["whitelist"]:
         await bot.process_commands(message)
+        return
+
+    # 黑名單封鎖
+    if message.author.id in data["blacklist"]:
+        try:
+            await message.delete()
+        except:
+            pass
         return
 
     text = message.content.lower()
@@ -202,7 +145,7 @@ async def on_message(message):
         if word in text:
             violation = True
             reason = "詐騙連結"
-            break  # 一旦偵測到就不用再檢查文字
+            break
 
     # AI文字偵測
     if text and not violation:
@@ -211,13 +154,10 @@ async def on_message(message):
                 model="omni-moderation-latest",
                 input=text
             )
-            # 兼容新版 SDK
             results = response["results"] if "results" in response else response.results
-
             if results[0]["flagged"]:
                 violation = True
                 reason = "不當語言"
-
         except Exception as e:
             print("Moderation API error:", e)
 
@@ -231,13 +171,23 @@ async def on_message(message):
 
     # 處理違規
     if violation:
-        await message.delete()
+        try:
+            await message.delete()
+        except:
+            pass
         await punish(message.author, message.guild, reason)
 
-    # 最後一定要處理指令
     await bot.process_commands(message)
-bot.run(TOKEN)
 
+# -------------------------------
+# 啟動 Bot
+# -------------------------------
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Bot 已啟動: {bot.user}")
+
+bot.run(os.getenv("DISCORD_TOKEN"))
 
 
 
