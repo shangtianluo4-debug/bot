@@ -165,17 +165,17 @@ async def on_message(message):
 
     # AI文字偵測
     if text and not violation:
-        try:
-            response = client.moderations.create(
-                model="omni-moderation-latest",
-                input=text
-            )
-            results = response["results"] if "results" in response else response.results
-            if results[0]["flagged"]:
-                violation = True
-                reason = "不當語言"
-        except Exception as e:
-            print("Moderation API error:", e)
+    try:
+        response = await client.moderations.create(
+            model="omni-moderation-latest",
+            input=message.content  # 傳原始文字
+        )
+        results = response["results"] if "results" in response else response.results
+        if results[0]["flagged"]:
+            violation = True
+            reason = "不當語言"
+    except Exception as e:
+        print("Moderation API error:", e)
 
     # 圖片偵測
     if message.attachments and not violation:
@@ -204,6 +204,7 @@ async def on_ready():
     print(f"Bot 已啟動: {bot.user}")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
 
 
