@@ -5,6 +5,7 @@ from openai import OpenAI
 import os
 import json
 import datetime
+import time
 
 # -------------------------------
 # 初始化
@@ -28,6 +29,12 @@ scam_words = ["discord.gift/", "nitro", "free money", "bit.ly/"]
 
 # 你的 Discord ID（/say 專用）
 MY_USER_ID = 1442017307332182168  # <-- 改成你本人 ID
+
+# -------------------------------
+# 速率限制 (避免 429)
+# -------------------------------
+last_checked = {}  # user_id -> timestamp
+COOLDOWN = 3  # 秒，同一使用者短時間內只檢測一次
 
 # -------------------------------
 # 權限檢查
@@ -152,18 +159,25 @@ async def on_message(message):
     if message.author.bot:
         return
 
+    now = time.time()
+    user_id = message.author.id
+
     # 白名單無敵
-    if message.author.id in data["whitelist"]:
+    if user_id in data["whitelist"]:
         await bot.process_commands(message)
         return
 
     # 黑名單封鎖
-    if message.author.id in data["blacklist"]:
-        try:
-            await message.delete()
-        except:
-            pass
+    if user_id in data["blacklist"]:
+        try: await message.delete()
+        except: pass
         return
+
+    # 檢查冷卻時間 (避免 429)
+    if user_id in last_checked and now - last_checked[user_id] < COOLDOWN:
+        await bot.process_commands(message)
+        return
+    last_checked[user_id] = now
 
     text = message.content
     violation = False
@@ -227,7 +241,3 @@ async def on_ready():
     print(f"Bot 已啟動: {bot.user}")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
-
-
-
-
