@@ -41,21 +41,28 @@ def save():
 # -----------------------------
 # /say 指令
 # -----------------------------
+discord.Intents.all())
+
+# -----------------------------
+# /say 斜線指令
+# -----------------------------
 class Say(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="say", description="機器人代替你發訊息")
-    @app_commands.describe(message="你想讓機器人說的內容")
+    @app_commands.command(
+        name="say", 
+        description="機器人代替你發訊息"
+    )
+    @app_commands.describe(
+        message="你想讓機器人說的內容"
+    )
     async def say(self, interaction: Interaction, message: str):
-        # 隱藏回應，其他人看不到誰使用指令
-        await interaction.response.send_message("已發送訊息！", ephemeral=True)
-
-        # 用 Bot 自己身份在頻道發訊息
+        # 立刻回應使用者，但隱藏給其他人看
+        await interaction.response.send_message("訊息已發送！", ephemeral=True)
+        
+        # 由 Bot 自己發訊息到同一個頻道
         await interaction.channel.send(message)
-
-
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
 # 在 class 定義後再加
 bot.add_cog(Say(bot))
@@ -230,6 +237,7 @@ async def on_message(message):
     # 最後一定要處理指令
     await bot.process_commands(message)
 bot.run(TOKEN)
+
 
 
 
