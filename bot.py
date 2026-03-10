@@ -174,10 +174,6 @@ async def punish(member, guild, reason):
             f"{member} 違規\n原因: {reason}\n違規次數: {warn}"
         )
 
-# ------------------
-# 訊息監控
-# ------------------
-
 @bot.event
 async def on_message(message):
 
@@ -198,33 +194,39 @@ async def on_message(message):
         if word in text:
             violation = True
             reason = "詐騙連結"
+            break  # 一旦偵測到就不用再檢查文字
 
     # AI文字偵測
     if text and not violation:
+        try:
+            response = client.moderations.create(
+                model="omni-moderation-latest",
+                input=text
+            )
+            # 兼容新版 SDK
+            results = response["results"] if "results" in response else response.results
 
-        response = client.moderations.create(
-            model="omni-moderation-latest",
-            input=text
-        )
+            if results[0]["flagged"]:
+                violation = True
+                reason = "不當語言"
 
-        if response.results[0].flagged:
-            violation = True
-            reason = "不當語言"
+        except Exception as e:
+            print("Moderation API error:", e)
 
     # 圖片偵測
-    if message.attachments:
-
+    if message.attachments and not violation:
         for attachment in message.attachments:
             if attachment.content_type and "image" in attachment.content_type:
                 violation = True
                 reason = "疑似不當圖片"
+                break
 
+    # 處理違規
     if violation:
-
         await message.delete()
-
         await punish(message.author, message.guild, reason)
 
+    # 最後一定要處理指令
     await bot.process_commands(message)
-
 bot.run(TOKEN)
+
