@@ -2,8 +2,10 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from openai import OpenAI
+import os
 
-TOKEN = "DISCORD_TOKEN"
+TOKEN = os.getenv("DISCORD_TOKEN")
+
 
 client = OpenAI()
 
@@ -94,3 +96,4 @@ async def whitelist_cmd(interaction: discord.Interaction, member: discord.Member
 
 
 bot.run(TOKEN)
+
