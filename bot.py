@@ -38,17 +38,6 @@ def save():
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
-# ------------------
-# Bot啟動
-# ------------------
-
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f"Bot 已上線 {bot.user}")
-
-bot.add_cog(Say(bot))
-
 # -----------------------------
 # /say 指令
 # -----------------------------
@@ -59,11 +48,24 @@ class Say(commands.Cog):
     @app_commands.command(name="say", description="機器人代替你發訊息")
     @app_commands.describe(message="你想讓機器人說的內容")
     async def say(self, interaction: Interaction, message: str):
-        # 立刻回應隱藏 (ephemeral=True)
+        # 隱藏回應，其他人看不到誰使用指令
         await interaction.response.send_message("已發送訊息！", ephemeral=True)
 
-        # 用機器人身份在同一頻道發訊息
+        # 用 Bot 自己身份在頻道發訊息
         await interaction.channel.send(message)
+
+
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+
+# 在 class 定義後再加
+bot.add_cog(Say(bot))
+# ------------------
+# Bot啟動
+# ------------------
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Bot 已啟動: {bot.user}")
 # ------------------
 # 設置log頻道
 # ------------------
@@ -228,6 +230,7 @@ async def on_message(message):
     # 最後一定要處理指令
     await bot.process_commands(message)
 bot.run(TOKEN)
+
 
 
 
