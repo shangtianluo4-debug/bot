@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
+from discord import app_commands, Interaction
 from openai import OpenAI
 import os
 import json
@@ -46,6 +46,8 @@ def save():
 async def on_ready():
     await bot.tree.sync()
     print(f"Bot 已上線 {bot.user}")
+
+bot.add_cog(Say(bot))
 
 # ------------------
 # !say 偽裝說話
@@ -229,4 +231,5 @@ async def on_message(message):
     # 最後一定要處理指令
     await bot.process_commands(message)
 bot.run(TOKEN)
+
 
