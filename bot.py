@@ -16,36 +16,50 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
 
-# 載入黑白名單資料
+# 載入資料
 if os.path.exists("data.json"):
     with open("data.json", "r") as f:
         data = json.load(f)
 else:
-    data = {"whitelist": [], "blacklist": [], "violations": {}}
+    data = {"whitelist": [], "blacklist": [], "violations": {}, "punish_channel_id": None}
 
 # 詐騙字詞清單
 scam_words = ["discord.gift/", "nitro", "free money", "bit.ly/"]
 
+# 你的 Discord ID（/say 專用）
+MY_USER_ID = 1442017307332182168  # <-- 改成你本人 ID
+
 # -------------------------------
-# /say 指令
+# 權限檢查
 # -------------------------------
-@bot.tree.command(name="say", description="機器人代替你發訊息")
+def is_admin(interaction: Interaction):
+    return interaction.user.guild_permissions.administrator
+
+# -------------------------------
+# /say 指令（僅限本人）
+# -------------------------------
+@bot.tree.command(name="say", description="機器人代替你發訊息（僅機器創作者本人可使用）")
 @app_commands.describe(message="你想讓機器人說的內容")
 async def say(interaction: Interaction, message: str):
+    if interaction.user.id != MY_USER_ID:
+        await interaction.response.send_message("你沒有權限使用這個指令！", ephemeral=True)
+        return
     await interaction.response.send_message("訊息已發送！", ephemeral=True)
     await interaction.channel.send(message)
 
 # -------------------------------
-# 黑白名單管理指令
+# 黑白名單管理（管理員專用）
 # -------------------------------
-@bot.tree.command(name="whitelist", description="管理白名單")
+@bot.tree.command(name="whitelist", description="管理白名單（需管理員）")
 @app_commands.describe(action="add 或 remove", member="要操作的使用者")
 async def whitelist(interaction: Interaction, action: str, member: discord.Member):
+    if not is_admin(interaction):
+        await interaction.response.send_message("你沒有權限使用此指令！", ephemeral=True)
+        return
     user_id = member.id
     if action.lower() == "add":
         if user_id not in data["whitelist"]:
             data["whitelist"].append(user_id)
-            # 移除黑名單
             if user_id in data["blacklist"]:
                 data["blacklist"].remove(user_id)
             await interaction.response.send_message(f"{member} 已加入白名單", ephemeral=True)
@@ -59,19 +73,19 @@ async def whitelist(interaction: Interaction, action: str, member: discord.Membe
             await interaction.response.send_message(f"{member} 不在白名單", ephemeral=True)
     else:
         await interaction.response.send_message("action 只能是 add 或 remove", ephemeral=True)
-
-    # 存檔
     with open("data.json", "w") as f:
         json.dump(data, f, indent=4)
 
-@bot.tree.command(name="blacklist", description="管理黑名單")
+@bot.tree.command(name="blacklist", description="管理黑名單（需管理員）")
 @app_commands.describe(action="add 或 remove", member="要操作的使用者")
 async def blacklist(interaction: Interaction, action: str, member: discord.Member):
+    if not is_admin(interaction):
+        await interaction.response.send_message("你沒有權限使用此指令！", ephemeral=True)
+        return
     user_id = member.id
     if action.lower() == "add":
         if user_id not in data["blacklist"]:
             data["blacklist"].append(user_id)
-            # 移除白名單
             if user_id in data["whitelist"]:
                 data["whitelist"].remove(user_id)
             await interaction.response.send_message(f"{member} 已加入黑名單", ephemeral=True)
@@ -85,18 +99,18 @@ async def blacklist(interaction: Interaction, action: str, member: discord.Membe
             await interaction.response.send_message(f"{member} 不在黑名單", ephemeral=True)
     else:
         await interaction.response.send_message("action 只能是 add 或 remove", ephemeral=True)
-
-    # 存檔
     with open("data.json", "w") as f:
         json.dump(data, f, indent=4)
 
 # -------------------------------
-# 設置懲罰通知頻道
+# 設置懲罰通知頻道（管理員專用）
 # -------------------------------
-@bot.tree.command(name="set_punish_channel", description="設置懲罰通知發送頻道")
+@bot.tree.command(name="set_punish_channel", description="設置懲罰通知頻道（需管理員）")
 @app_commands.describe(channel="要用來接收懲罰通知的頻道")
 async def set_punish_channel(interaction: Interaction, channel: discord.TextChannel):
-    # 儲存頻道 ID
+    if not is_admin(interaction):
+        await interaction.response.send_message("你沒有權限使用此指令！", ephemeral=True)
+        return
     data["punish_channel_id"] = channel.id
     with open("data.json", "w") as f:
         json.dump(data, f, indent=4)
@@ -114,20 +128,19 @@ async def punish(member, guild, reason):
         if member.id not in data["blacklist"]:
             data["blacklist"].append(member.id)
 
-    # 找到懲罰頻道
+    # 發送懲罰通知
     punish_channel = None
-    if "punish_channel_id" in data:
+    if "punish_channel_id" in data and data["punish_channel_id"]:
         punish_channel = guild.get_channel(data["punish_channel_id"])
     if punish_channel:
         await punish_channel.send(f"{member.mention} 違規: {reason} (第 {data['violations'][user_id]} 次)")
 
-    # 暫時禁言
+    # 暫時禁言 5 分鐘
     try:
         await member.edit(timed_out_until=datetime.datetime.utcnow() + datetime.timedelta(minutes=5))
     except:
         pass
 
-    # 儲存資料
     with open("data.json", "w") as f:
         json.dump(data, f, indent=4)
 
@@ -152,38 +165,48 @@ async def on_message(message):
             pass
         return
 
-    text = message.content.lower()
+    text = message.content
     violation = False
     reason = ""
 
     # 詐騙偵測
     for word in scam_words:
-        if word in text:
+        if word.lower() in text.lower():
             violation = True
             reason = "詐騙連結"
             break
 
     # AI文字偵測
     if text and not violation:
-    try:
-        response = await client.moderations.create(
-            model="omni-moderation-latest",
-            input=message.content  # 傳原始文字
-        )
-        results = response["results"] if "results" in response else response.results
-        if results[0]["flagged"]:
-            violation = True
-            reason = "不當語言"
-    except Exception as e:
-        print("Moderation API error:", e)
+        try:
+            response = await client.moderations.create(
+                model="omni-moderation-latest",
+                input=text
+            )
+            results = response["results"] if "results" in response else response.results
+            if results[0]["flagged"]:
+                violation = True
+                reason = "不當語言"
+        except Exception as e:
+            print("Moderation API error:", e)
 
-    # 圖片偵測
+    # AI圖片偵測
     if message.attachments and not violation:
         for attachment in message.attachments:
             if attachment.content_type and "image" in attachment.content_type:
-                violation = True
-                reason = "疑似不當圖片"
-                break
+                image_url = attachment.url
+                try:
+                    response = await client.moderations.create(
+                        model="omni-moderation-latest",
+                        input=f"檢查這張圖片是否含有不當或色情內容: {image_url}"
+                    )
+                    results = response["results"] if "results" in response else response.results
+                    if results[0]["flagged"]:
+                        violation = True
+                        reason = "疑似不當圖片"
+                        break
+                except Exception as e:
+                    print("Moderation API image error:", e)
 
     # 處理違規
     if violation:
@@ -204,8 +227,6 @@ async def on_ready():
     print(f"Bot 已啟動: {bot.user}")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
-
-
 
 
 
