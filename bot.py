@@ -91,6 +91,18 @@ async def blacklist(interaction: Interaction, action: str, member: discord.Membe
         json.dump(data, f, indent=4)
 
 # -------------------------------
+# 設置懲罰通知頻道
+# -------------------------------
+@bot.tree.command(name="set_punish_channel", description="設置懲罰通知發送頻道")
+@app_commands.describe(channel="要用來接收懲罰通知的頻道")
+async def set_punish_channel(interaction: Interaction, channel: discord.TextChannel):
+    # 儲存頻道 ID
+    data["punish_channel_id"] = channel.id
+    with open("data.json", "w") as f:
+        json.dump(data, f, indent=4)
+    await interaction.response.send_message(f"已將懲罰通知頻道設為 {channel.mention}", ephemeral=True)
+
+# -------------------------------
 # 懲罰功能
 # -------------------------------
 async def punish(member, guild, reason):
@@ -102,18 +114,22 @@ async def punish(member, guild, reason):
         if member.id not in data["blacklist"]:
             data["blacklist"].append(member.id)
 
-    # 儲存
-    with open("data.json", "w") as f:
-        json.dump(data, f, indent=4)
-
-    punish_channel = discord.utils.get(guild.text_channels, name="懲罰通知")
+    # 找到懲罰頻道
+    punish_channel = None
+    if "punish_channel_id" in data:
+        punish_channel = guild.get_channel(data["punish_channel_id"])
     if punish_channel:
         await punish_channel.send(f"{member.mention} 違規: {reason} (第 {data['violations'][user_id]} 次)")
 
+    # 暫時禁言
     try:
         await member.edit(timed_out_until=datetime.datetime.utcnow() + datetime.timedelta(minutes=5))
     except:
         pass
+
+    # 儲存資料
+    with open("data.json", "w") as f:
+        json.dump(data, f, indent=4)
 
 # -------------------------------
 # 訊息監控
@@ -188,6 +204,7 @@ async def on_ready():
     print(f"Bot 已啟動: {bot.user}")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
 
 
