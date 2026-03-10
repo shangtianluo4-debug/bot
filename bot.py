@@ -49,24 +49,21 @@ async def on_ready():
 
 bot.add_cog(Say(bot))
 
-# ------------------
-# !say 偽裝說話
-# ------------------
+# -----------------------------
+# /say 指令
+# -----------------------------
+class Say(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-@bot.command()
-async def say(ctx, member: discord.Member, *, text):
+    @app_commands.command(name="say", description="機器人代替你發訊息")
+    @app_commands.describe(message="你想讓機器人說的內容")
+    async def say(self, interaction: Interaction, message: str):
+        # 立刻回應隱藏 (ephemeral=True)
+        await interaction.response.send_message("已發送訊息！", ephemeral=True)
 
-    webhook = await ctx.channel.create_webhook(name=member.display_name)
-
-    await webhook.send(
-        content=text,
-        username=member.display_name,
-        avatar_url=member.display_avatar.url
-    )
-
-    await webhook.delete()
-    await ctx.message.delete()
-
+        # 用機器人身份在同一頻道發訊息
+        await interaction.channel.send(message)
 # ------------------
 # 設置log頻道
 # ------------------
@@ -231,5 +228,6 @@ async def on_message(message):
     # 最後一定要處理指令
     await bot.process_commands(message)
 bot.run(TOKEN)
+
 
 
