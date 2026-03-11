@@ -7,7 +7,7 @@ import json, os, datetime
 # 基本設定
 # -----------------------
 TOKEN = os.getenv("DISCORD_TOKEN")
-OWNER_ID = 123456789012345678  # ← 你的 Discord ID
+OWNER_ID = 1442017307332182168  # ← 你的 Discord ID
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
 DATA_FILE = "data.json"
@@ -159,3 +159,4 @@ async def on_ready():
     await bot.tree.sync()
 
 bot.run(TOKEN)
+
