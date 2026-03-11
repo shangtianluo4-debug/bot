@@ -103,7 +103,7 @@ async def on_message(message):
 # 領域展開 無量空處
 # -------------------
 
-@bot.tree.command(name="領域展開", description="無量空處")
+@bot.tree.command(name="domain", description="領域展開 · 無量空處")
 @app_commands.describe(
     功能="黑名單/白名單/機器人狀態/後台統計",
     成員="指定成員"
@@ -164,7 +164,7 @@ async def domain(
 # 0.2秒領域展開
 # -------------------
 
-@bot.tree.command(name="0.2的領域展開", description="瞬間領域")
+@bot.tree.command(name="domain02", description="0.2秒的領域展開")
 @app_commands.describe(
     功能="違規排行榜/假冒說話/刪除訊息/設置懲罰頻道",
     成員="指定成員",
@@ -237,7 +237,7 @@ async def mini_domain(
 # 虛式茈
 # -------------------
 
-@bot.tree.command(name="虛式茈", description="虛式 · 茈")
+@bot.tree.command(name="purple", description="虛式 · 茈")
 async def purple(
     interaction: discord.Interaction,
     訊息: str
@@ -258,3 +258,4 @@ async def purple(
 # -------------------
 
 bot.run(TOKEN)
+
