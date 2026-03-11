@@ -136,8 +136,19 @@ async def on_message(message):
 # ----------------------------
 # /領域展開 · 無量空處
 # ----------------------------
-@bot.tree.command(name="領域展開", description="領域展開 · 無量空處")
+功能選單 = [
+    app_commands.Choice(name="查看黑白名單", value="查看黑白名單"),
+    app_commands.Choice(name="黑名單加入", value="黑名單加入"),
+    app_commands.Choice(name="黑名單移除", value="黑名單移除"),
+    app_commands.Choice(name="白名單加入", value="白名單加入"),
+    app_commands.Choice(name="白名單移除", value="白名單移除"),
+    app_commands.Choice(name="機器人狀態", value="機器人狀態"),
+]
+
+@app_commands.command(name="領域展開", description="領域展開 · 無量空處")
 @app_commands.checks.has_permissions(administrator=True)
+@app_commands.describe(功能="請選擇功能", 目標="選擇成員 (可選)")
+@app_commands.choices(功能=功能選單)
 async def 領域展開(interaction: discord.Interaction, 功能: str, 目標: discord.Member=None):
     data = load_data()
     if 功能 == "查看黑白名單":
@@ -174,38 +185,52 @@ async def 領域展開(interaction: discord.Interaction, 功能: str, 目標: di
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # ----------------------------
-# /0.2秒領域展開
+# /0_2秒領域展開
 # ----------------------------
-@bot.tree.command(name="0_2秒領域展開", description="0.2秒領域展開")
+功能選單 = [
+    app_commands.Choice(name="違規排行榜(本服)", value="違規排行榜本服"),
+    app_commands.Choice(name="違規排行榜(全服)", value="違規排行榜全服"),
+    app_commands.Choice(name="假冒別人說話", value="假冒說話"),
+    app_commands.Choice(name="刪除訊息", value="刪除訊息"),
+    app_commands.Choice(name="設置違規懲罰頻道", value="設置懲罰頻道")
+]
+
+@app_commands.command(name="0_2秒領域展開", description="瞬間領域操作")
 @app_commands.checks.has_permissions(administrator=True)
-async def 秒領域(interaction: discord.Interaction, 功能: str, 目標: discord.Member=None, 訊息: str=None, 刪除數量: int=0, 頻道: discord.TextChannel=None):
+@app_commands.describe(功能="請選擇操作功能", 目標="選擇成員 (可選)", 數量="刪除訊息數量 (可選)")
+@app_commands.choices(功能=功能選單)
+async def mini_domain(interaction: discord.Interaction, 功能: str, 目標: discord.Member=None, 數量: int=None):
     data = load_data()
-    if 功能 == "假冒別人說話" and 目標 and 訊息:
-        await interaction.response.send_message("✅ 已代發訊息", ephemeral=True)
-        await interaction.channel.send(訊息)
-    elif 功能 == "刪除訊息" and 刪除數量 > 0:
-        deleted = await interaction.channel.purge(limit=刪除數量)
-        await interaction.response.send_message(f"✅ 已刪除 {len(deleted)} 則訊息", ephemeral=True)
-    elif 功能 == "設置違規頻道" and 頻道:
-        data["懲罰頻道"] = 頻道.id
-        save_data(data)
-        await interaction.response.send_message(f"✅ 已設定 {頻道.mention} 為違規通知頻道", ephemeral=True)
-    elif 功能 == "違規排行榜":
-        sorted_users = sorted(data["違規次數"].items(), key=lambda x: x[1], reverse=True)
-        desc = "\n".join([f"<@{u}>：{c}次" for u,c in sorted_users[:10]]) or "無違規紀錄"
-        embed = discord.Embed(title="違規排行榜", description=desc, color=0x7a5cff, timestamp=datetime.now(timezone.utc))
+    
+    if 功能.startswith("違規排行榜"):
+        embed = discord.Embed(title="📊 違規排行榜", color=0x7a5cff, timestamp=datetime.now(timezone.utc))
+        if 功能 == "違規排行榜本服":
+            embed.description = "\n".join([f"<@{uid}>：{cnt}" for uid, cnt in data["違規次數"].items()])
+        else:
+            embed.description = "全服排行榜模擬數據"
         await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    elif 功能 == "假冒說話" and 目標:
+        await interaction.response.send_message(f"💬 機器人代替 <@{目標.id}> 說話 (內容由你輸入)", ephemeral=True)
+        # 這裡可加入你呼叫 AI API 或後續訊息發送
+    
+    elif 功能 == "刪除訊息" and 數量:
+        deleted = await interaction.channel.purge(limit=數量)
+        await interaction.response.send_message(f"✅ 已刪除 {len(deleted)} 則訊息", ephemeral=True)
+    
+    elif 功能 == "設置違規懲罰頻道":
+        data["懲罰頻道"] = interaction.channel.id
+        save_data(data)
+        await interaction.response.send_message(f"✅ 已設置本頻道為違規懲罰通知頻道", ephemeral=True)
 
 # ----------------------------
-# /虛式茈（創作者專用）
+# /虛式茈
 # ----------------------------
-@bot.tree.command(name="虛式茈", description="虛式茈（創作者專用）")
-async def 虛式茈(interaction: discord.Interaction, 訊息: str):
-    if interaction.user.id != OWNER_ID:
-        await interaction.response.send_message("❌ 你不是創作者，無法使用此指令", ephemeral=True)
-        return
-    await interaction.response.send_message("✅ 已代發訊息", ephemeral=True)
-    await interaction.channel.send(訊息)
+@app_commands.command(name="虛式茈", description="讓機器人幫你說話 (僅作者可用)")
+@app_commands.checks.is_owner()
+@app_commands.describe(內容="請輸入要說的內容")
+async def purple(interaction: discord.Interaction, 內容: str):
+    await interaction.response.send_message(內容)
 
 # ----------------------------
 # BOT 啟動
@@ -216,3 +241,4 @@ async def on_ready():
     print(f"Logged in as {bot.user} (五條悟 BOT 已啟動)")
 
 bot.run(TOKEN)
+
