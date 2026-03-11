@@ -128,12 +128,18 @@ async def domain02(interaction: Interaction, action: str = None, member: discord
 # ----------------------
 # 虛式茈 /purple
 # ----------------------
+# 自訂檢查
+def is_owner():
+    async def predicate(interaction: Interaction) -> bool:
+        return interaction.user.id == OWNER_ID
+    return app_commands.check(predicate)
+
+# 指令使用
 @bot.tree.command(name="purple", description="虛式 · 茈：讓機器人幫你說話")
-@app_commands.checks.is_owner()
+@is_owner()  # 只有你本人可用
 async def purple(interaction: Interaction, message: str):
     await interaction.response.defer(ephemeral=True)
     await interaction.channel.send(message)
-
 # ----------------------
 # 訊息監控
 # ----------------------
@@ -193,4 +199,5 @@ async def on_ready():
         print("同步指令錯誤:", e)
 
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
