@@ -84,6 +84,7 @@ async def domain(interaction: Interaction, action: str):
     target_user="代替發言對象（選擇成員）",
     message="代替發言內容",
     delete_count="刪除訊息數量"
+    target_channel="選擇日誌頻道"
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def domain02(
@@ -132,14 +133,16 @@ async def domain02(
     # -------------------------
     # 設置違規懲罰通知頻道
     # -------------------------
-    elif action == "設置違規頻道":
-        data["punish_channel"] = interaction.channel.id
-        save_data(data)
-        await interaction.response.send_message(f"✅ 已將本頻道設為違規懲罰通知頻道", ephemeral=True)
+# 設置違規懲罰通知頻道
+elif action == "設置違規頻道":
+    if not target_channel or not isinstance(target_channel, discord.TextChannel):
+        await interaction.response.send_message("❌ 請選擇一個有效的文字頻道", ephemeral=True)
         return
 
-    else:
-        await interaction.response.send_message("❌ 請選擇有效操作選項", ephemeral=True)
+    data["punish_channel"] = target_channel.id
+    save_data(data)
+    await interaction.response.send_message(f"✅ 已將 {target_channel.mention} 設為違規懲罰通知頻道", ephemeral=True)
+
 
 # -----------------------
 # /purple
@@ -159,4 +162,5 @@ async def on_ready():
     await bot.tree.sync()
 
 bot.run(TOKEN)
+
 
