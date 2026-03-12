@@ -10,11 +10,26 @@ import asyncio
 # ----------------------------
 # 基本設定
 # ----------------------------
-TOKEN = os.getenv("DISCORD_TOKEN")
+# ----------------------------
+# 讀取環境變數
+# ----------------------------
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
-OWNER_ID = int(os.getenv("1442017307332182168"))  # BOT 創作者 ID
-DATA_FILE = "data.json"
+OWNER_ID_STR = os.getenv("OWNER_ID")  # 從環境變數讀取創作者 ID
 
+# 驗證環境變數是否存在
+if not DISCORD_TOKEN:
+    raise ValueError("⚠ 環境變數 DISCORD_TOKEN 未設定")
+if not OWNER_ID_STR:
+    raise ValueError("⚠ 環境變數 OWNER_ID 未設定")
+
+try:
+    OWNER_ID = int(OWNER_ID_STR)  # 轉成整數
+except ValueError:
+    raise ValueError("⚠ OWNER_ID 必須是純數字 Discord ID")
+
+print(f"BOT 創作者 ID: {OWNER_ID}")
+print(f"GROQ_KEY 已設定: {'是' if GROQ_KEY else '否'}")
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
@@ -433,6 +448,7 @@ async def on_ready():
         reset_daily_violations.start()
         
 bot.run(TOKEN)
+
 
 
 
