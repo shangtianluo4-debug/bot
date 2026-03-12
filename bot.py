@@ -233,6 +233,66 @@ async def purple(interaction: discord.Interaction, 內容: str):
     await interaction.response.send_message(內容)
 
 # ----------------------------
+# /help
+# ----------------------------
+@bot.tree.command(name="help", description="查看五條悟 BOT 功能介紹")
+async def help_command(interaction: discord.Interaction):
+
+    embed = discord.Embed(
+        title="五條悟 BOT（ごじょう さとる）",
+        description="「領域展開 · 無量空處」\n高階伺服器管理與 AI 偵測機器人",
+        color=0x7a5cff
+    )
+
+    embed.add_field(
+        name="領域展開 · 無量空處",
+        value=(
+            "管理員專用指令\n"
+            "• 查看黑白名單\n"
+            "• 黑名單加入 / 移除\n"
+            "• 白名單加入 / 移除\n"
+            "• 查看機器人狀態"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="0.2秒領域展開",
+        value=(
+            "快速管理工具\n"
+            "• 違規排行榜（本服 / 全服）\n"
+            "• 假冒別人說話\n"
+            "• 刪除指定數量訊息\n"
+            "• 設置違規懲罰通知頻道"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="虛式茈",
+        value=(
+            "僅 BOT 創作者可使用\n"
+            "讓機器人代替發送訊息"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="AI 自動偵測系統",
+        value=(
+            "• 自動偵測違規文字\n"
+            "• 自動偵測違規圖片\n"
+            "• 自動刪除違規訊息\n"
+            "• 違規達 7 次自動加入黑名單"
+        ),
+        inline=False
+    )
+
+    embed.set_footer(text="五條悟 BOT 系統")
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
+
+    await interaction.response.send_message(embed=embed)
+# ----------------------------
 # BOT 啟動
 # ----------------------------
 @bot.event
@@ -241,4 +301,5 @@ async def on_ready():
     print(f"Logged in as {bot.user} (五條悟 BOT 已啟動)")
 
 bot.run(TOKEN)
+
 
