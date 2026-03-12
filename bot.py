@@ -148,7 +148,7 @@ async def on_message(message):
     app_commands.Choice(name="機器人狀態", value="機器人狀態"),
 ]
 
-@app_commands.command(name="領域展開", description="領域展開 · 無量空處")
+@bot.tree.command(name="領域展開", description="領域展開 · 無量空處")
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.describe(功能="請選擇功能", 目標="選擇成員 (可選)")
 @app_commands.choices(功能=功能選單)
@@ -198,7 +198,7 @@ async def 領域展開(interaction: discord.Interaction, 功能: str, 目標: di
     app_commands.Choice(name="設置違規懲罰頻道", value="設置懲罰頻道")
 ]
 
-@app_commands.command(name="0_2秒領域展開", description="瞬間領域操作")
+@bot.tree.command(name="0_2秒領域展開", description="瞬間領域操作")
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.describe(功能="請選擇操作功能", 目標="選擇成員 (可選)", 數量="刪除訊息數量 (可選)")
 @app_commands.choices(功能=功能選單)
@@ -229,7 +229,7 @@ async def mini_domain(interaction: discord.Interaction, 功能: str, 目標: dis
 # ----------------------------
 # /虛式茈
 # ----------------------------
-@app_commands.command(name="虛式茈", description="讓機器人幫你說話 (僅作者可用)")
+@bot.tree.command(name="虛式茈", description="讓機器人幫你說話 (僅作者可用)")
 @app_commands.check(is_owner)
 @app_commands.describe(內容="請輸入要說的內容")
 async def purple(interaction: discord.Interaction, 內容: str):
@@ -304,6 +304,7 @@ async def on_ready():
     print(f"Logged in as {bot.user} (五條悟 BOT 已啟動)")
 
 bot.run(TOKEN)
+
 
 
 
