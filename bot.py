@@ -230,7 +230,7 @@ async def mini_domain(interaction: discord.Interaction, 功能: str, 目標: dis
 # /虛式茈
 # ----------------------------
 @app_commands.command(name="虛式茈", description="讓機器人幫你說話 (僅作者可用)")
-@app_commands.checks(is_owner)
+@app_commands.check(is_owner)
 @app_commands.describe(內容="請輸入要說的內容")
 async def purple(interaction: discord.Interaction, 內容: str):
     await interaction.response.send_message(內容)
@@ -304,6 +304,7 @@ async def on_ready():
     print(f"Logged in as {bot.user} (五條悟 BOT 已啟動)")
 
 bot.run(TOKEN)
+
 
 
 
