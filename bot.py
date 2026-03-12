@@ -333,13 +333,15 @@ async def mini_domain(interaction: discord.Interaction, 功能: str, 目標: dis
     elif 功能 == "刪除訊息" and 數量:
         deleted = await interaction.channel.purge(limit=min(數量, 100))
         await interaction.response.send_message(f"✅ 已刪除 {len(deleted)} 則訊息", ephemeral=True)
-    
-    elif 功能 == "設置違規懲罰頻道":
+
+elif 功能 == "設置違規懲罰頻道":
     # 如果有選擇頻道，就用選擇的，否則用當前頻道
     設置頻道 = 目標 if 目標 else interaction.channel
     data["懲罰頻道"] = 設置頻道.id
     save_data(data)
-    await interaction.response.send_message(f"✅ 已設置 <#{設置頻道.id}> 為違規懲罰通知頻道", ephemeral=True)
+    await interaction.response.send_message(
+        f"✅ 已設置 <#{設置頻道.id}> 為違規懲罰通知頻道", ephemeral=True
+    )
 # ----------------------------
 # /help 指令
 # ----------------------------
@@ -387,6 +389,7 @@ async def on_ready():
         reset_daily_violations.start()
 
 bot.run(DISCORD_TOKEN)
+
 
 
 
