@@ -15,7 +15,7 @@ import asyncio
 # ----------------------------
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
-OWNER_ID_STR = os.getenv("OWNER_ID")  # 從環境變數讀取創作者 ID
+OWNER_ID = int(os.getenv("OWNER_ID"))   # 從環境變數讀取創作者 ID
 
 # 驗證環境變數是否存在
 if not DISCORD_TOKEN:
@@ -448,6 +448,7 @@ async def on_ready():
         reset_daily_violations.start()
         
 bot.run(TOKEN)
+
 
 
 
