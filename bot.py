@@ -131,8 +131,8 @@ async def 偵測文字違規(text):
 
                 result = await resp.json()
 
-                content = result["choices"][0]["message"]["content"]
-
+               return res.get("flagged", False)
+            
                 if content.startswith("違規"):
                     return True, content
 
@@ -679,6 +679,7 @@ async def on_ready():
         reset_daily_violations.start()
 
 bot.run(DISCORD_TOKEN)
+
 
 
 
