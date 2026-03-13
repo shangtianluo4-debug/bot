@@ -125,15 +125,21 @@ async def 偵測文字違規(text):
     }
 
     try:
-
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=payload) as resp:
-
                 result = await resp.json()
-    return res.get("flagged", False)
-            
+
+                # 檢查是否有 choices
+                if "choices" not in result or not result["choices"]:
+                    print("Groq API 回傳錯誤:", result)
+                    return False, ""
+
+                content = result["choices"][0]["message"]["content"]
+
                 if content.startswith("違規"):
                     return True, content
+                else:
+                    return False, ""
 
     except Exception as e:
         print("Groq AI 偵測錯誤:", e)
@@ -678,6 +684,7 @@ async def on_ready():
         reset_daily_violations.start()
 
 bot.run(DISCORD_TOKEN)
+
 
 
 
