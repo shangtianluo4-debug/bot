@@ -191,7 +191,7 @@ SAFE
 """
 
             payload = {
-                "model": "llama3-8b-8192",
+                "model": "llama3-groq-8b-8192-tool-use-preview",
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
@@ -684,6 +684,7 @@ async def on_ready():
         reset_daily_violations.start()
 
 bot.run(DISCORD_TOKEN)
+
 
 
 
