@@ -347,80 +347,109 @@ async def reset_daily_violations():
 # ----------------------------
 @bot.event
 async def on_message(message):
+
     if message.author.bot:
         return
 
     data = load_data()
     uid = message.author.id
 
+    # 白名單
     if uid in data["白名單"]:
         await bot.process_commands(message)
         return
 
+    # 黑名單
     if uid in data["黑名單"]:
-        try: await message.delete()
-        except: pass
+        try:
+            await message.delete()
+        except:
+            pass
         return
-
-# ----------------
-# 詐騙連結偵測
-# ----------------
-if await 偵測詐騙連結(message.content):
-
-    try:
-        await message.delete()
-    except:
-        pass
-
-    await 處理違規(
-        message.author,
-        message.guild,
-        "疑似詐騙 / 廣告連結"
-    )
-
-    return
-
-    if await 檢查刷訊息(uid):
-        try: await message.delete()
-        except: pass
-        await 處理違規(message.author, message.guild, "刷訊息過快")
-        return
-
-    違規, 原因 = await 偵測文字違規(message.content)
 
     # ----------------
-# 圖片偵測
-# ----------------
-if message.attachments:
+    # 詐騙連結偵測
+    # ----------------
+    if await 偵測詐騙連結(message.content):
 
-    for att in message.attachments:
+        try:
+            await message.delete()
+        except:
+            pass
 
-        if att.content_type and "image" in att.content_type:
+        await 處理違規(
+            message.author,
+            message.guild,
+            "疑似詐騙 / 廣告連結"
+        )
 
-            flag = await 偵測圖片違規(att.url)
+        return
 
-            if flag:
+    # ----------------
+    # 防刷訊息
+    # ----------------
+    if await 檢查刷訊息(uid):
 
-                try:
-                    await message.delete()
-                except:
-                    pass
+        try:
+            await message.delete()
+        except:
+            pass
 
-                await 處理違規(
-                    message.author,
-                    message.guild,
-                    "疑似色情 / 不當圖片"
-                )
+        await 處理違規(
+            message.author,
+            message.guild,
+            "刷訊息過快"
+        )
 
-                return
+        return
+
+    # ----------------
+    # 圖片偵測
+    # ----------------
+    if message.attachments:
+
+        for att in message.attachments:
+
+            if att.content_type and "image" in att.content_type:
+
+                flag = await 偵測圖片違規(att.url)
+
+                if flag:
+
+                    try:
+                        await message.delete()
+                    except:
+                        pass
+
+                    await 處理違規(
+                        message.author,
+                        message.guild,
+                        "疑似色情 / 不當圖片"
+                    )
+
+                    return
+
+    # ----------------
+    # AI文字偵測
+    # ----------------
+    違規, 原因 = await 偵測文字違規(message.content)
 
     if 違規:
-        try: await message.delete()
-        except: pass
-        await 處理違規(message.author, message.guild, 原因)
+
+        try:
+            await message.delete()
+        except:
+            pass
+
+        await 處理違規(
+            message.author,
+            message.guild,
+            原因
+        )
+
+        return
 
     await bot.process_commands(message)
-
 # ----------------------------
 # /虛式茈 (保留原作者指令)
 # ----------------------------
@@ -650,6 +679,7 @@ async def on_ready():
         reset_daily_violations.start()
 
 bot.run(DISCORD_TOKEN)
+
 
 
 
