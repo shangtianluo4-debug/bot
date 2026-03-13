@@ -66,46 +66,187 @@ def log_action(action):
 # ----------------------------
 def is_owner(interaction: discord.Interaction):
     return interaction.user.id == OWNER_ID
+    
+# ----------------------------
+# 手動偵測不當詞語
+# ----------------------------
+不當詞 = ["操你", "白癡", "智障"]
+
+for word in 不當詞:
+    if word in text:
+        return True, "不當文字"
 
 # ----------------------------
 # AI 偵測文字違規 (關鍵字或 Groq)
 # ----------------------------
 async def 偵測文字違規(text):
-    text = text.lower()
-    不當詞 = ["髒話1","髒話2","詐騙","違規詞"]
-    for word in 不當詞:
-        if word in text:
-            return True, "不當文字"
-    # Groq AI 偵測
-    if GROQ_KEY:
-        try:
-            headers = {"Authorization": f"Bearer {GROQ_KEY}"}
-            payload = {"input": text}
-            async with aiohttp.ClientSession() as session:
-                async with session.post("https://api.groq.ai/v1/moderation", headers=headers, json=payload) as resp:
-                    res = await resp.json()
-                    if res.get("flagged"):
-                        return True, "AI判定違規文字"
-        except Exception as e:
-            print("Groq API 文字偵測錯誤:", e)
-    return False, ""
 
+    if not GROQ_KEY:
+        return False, ""
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    prompt = f"""
+你是一個 Discord 管理機器人。
+請判斷以下訊息是否違反社群規則。
+
+違規類型：
+- 仇恨言論
+- 色情內容
+- 詐騙
+- 惡意辱罵
+- 過度髒話
+
+如果違規只回答：
+違規:原因
+
+如果沒有違規只回答：
+正常
+
+訊息：
+{text}
+"""
+
+    payload = {
+        "model": "llama3-8b-8192",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0
+    }
+
+    try:
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as resp:
+
+                result = await resp.json()
+
+                content = result["choices"][0]["message"]["content"]
+
+                if content.startswith("違規"):
+                    return True, content
+
+    except Exception as e:
+        print("Groq AI 偵測錯誤:", e)
+
+    return False, ""
 # ----------------------------
 # AI 偵測圖片違規
 # ----------------------------
-async def 偵測圖片違規(url):
+async def 偵測圖片違規(url: str):
+
+    可疑詞 = [
+        "porn",
+        "sex",
+        "hentai",
+        "xxx",
+        "nsfw",
+        "rule34",
+        "18+"
+    ]
+
+    url_lower = url.lower()
+
+    for word in 可疑詞:
+        if word in url_lower:
+            return True
+
+    # 如果有 Groq AI 再進行 AI 判斷
     if GROQ_KEY:
-        headers = {"Authorization": f"Bearer {GROQ_KEY}"}
-        payload = {"input": url}
+
         try:
+
+            headers = {
+                "Authorization": f"Bearer {GROQ_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            prompt = f"""
+以下是一張圖片網址：
+{url}
+
+請判斷是否可能包含：
+色情、裸露、成人內容
+
+如果是請回答：
+NSFW
+
+如果不是請回答：
+SAFE
+"""
+
+            payload = {
+                "model": "llama3-8b-8192",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0
+            }
+
             async with aiohttp.ClientSession() as session:
-                async with session.post("https://api.groq.ai/v1/moderation", headers=headers, json=payload) as resp:
-                    res = await resp.json()
-                    return res.get("flagged", False)
+
+                async with session.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers=headers,
+                    json=payload
+                ) as resp:
+
+                    result = await resp.json()
+
+                    content = result["choices"][0]["message"]["content"]
+
+                    if "NSFW" in content:
+                        return True
+
         except Exception as e:
-            print("Groq API 圖片偵測錯誤:", e)
+            print("圖片 AI 偵測錯誤:", e)
+
     return False
 
+# ----------------------------
+#  廣告 / 詐騙連結偵測
+# ----------------------------
+
+async def 偵測詐騙連結(text: str):
+
+    可疑關鍵字 = [
+        "free nitro",
+        "steam gift",
+        "claim reward",
+        "crypto invest",
+        "airdrop",
+        "免費nitro",
+        "送你nitro",
+        "投資加密",
+    ]
+
+    可疑網域 = [
+        "bit.ly",
+        "tinyurl",
+        "grabify",
+        "discord-nitro",
+        "steamgift",
+        "free-nitro",
+        "nitro-drop"
+    ]
+
+    lower = text.lower()
+
+    for word in 可疑關鍵字:
+        if word in lower:
+            return True
+
+    for domain in 可疑網域:
+        if domain in lower:
+            return True
+
+    return False
 # ----------------------------
 # 防刷訊息
 # ----------------------------
@@ -217,6 +358,24 @@ async def on_message(message):
         except: pass
         return
 
+# ----------------
+# 詐騙連結偵測
+# ----------------
+if await 偵測詐騙連結(message.content):
+
+    try:
+        await message.delete()
+    except:
+        pass
+
+    await 處理違規(
+        message.author,
+        message.guild,
+        "疑似詐騙 / 廣告連結"
+    )
+
+    return
+
     if await 檢查刷訊息(uid):
         try: await message.delete()
         except: pass
@@ -225,14 +384,31 @@ async def on_message(message):
 
     違規, 原因 = await 偵測文字違規(message.content)
 
-    if not 違規 and message.attachments:
-        for att in message.attachments:
-            if att.content_type and "image" in att.content_type:
-                flag = await 偵測圖片違規(att.url)
-                if flag:
-                    違規 = True
-                    原因 = "疑似不當圖片"
-                    break
+    # ----------------
+# 圖片偵測
+# ----------------
+if message.attachments:
+
+    for att in message.attachments:
+
+        if att.content_type and "image" in att.content_type:
+
+            flag = await 偵測圖片違規(att.url)
+
+            if flag:
+
+                try:
+                    await message.delete()
+                except:
+                    pass
+
+                await 處理違規(
+                    message.author,
+                    message.guild,
+                    "疑似色情 / 不當圖片"
+                )
+
+                return
 
     if 違規:
         try: await message.delete()
@@ -309,39 +485,120 @@ async def 領域展開(interaction: discord.Interaction, 功能: str, 目標: di
     app_commands.Choice(name="違規排行榜(全服)", value="違規排行榜全服"),
     app_commands.Choice(name="假冒別人說話", value="假冒說話"),
     app_commands.Choice(name="刪除訊息", value="刪除訊息"),
-    app_commands.Choice(name="設置違規懲罰頻道", value="設置懲罰頻道")
+    app_commands.Choice(name="設置違規懲罰頻道", value="設置懲罰頻道"),
+    app_commands.Choice(name="設置日誌頻道", value="設置日誌頻道")
 ]
 
 @bot.tree.command(name="0_2秒領域展開", description="瞬間領域操作")
 @app_commands.checks.has_permissions(administrator=True)
-@app_commands.describe(功能="請選擇操作功能", 目標="選擇成員 (可選)", 數量="刪除訊息數量 (可選)")
+@app_commands.describe(
+    功能="請選擇操作功能",
+    目標="選擇成員 (假冒說話用)",
+    數量="刪除訊息數量",
+    頻道="選擇要設置的頻道"
+)
 @app_commands.choices(功能=功能選單)
-async def mini_domain(interaction: discord.Interaction, 功能: str, 目標: discord.Member=None, 數量: int=None):
-    data = load_data()
-    
-    if 功能.startswith("違規排行榜"):
-        embed = discord.Embed(title="📊 違規排行榜", color=0x7a5cff, timestamp=datetime.now(timezone.utc))
-        if 功能 == "違規排行榜本服":
-            embed.description = "\n".join([f"<@{uid}>：{cnt}" for uid, cnt in data["違規次數"].items()]) or "無違規紀錄"
-        else:
-            embed.description = "全服排行榜模擬數據"
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    
-    elif 功能 == "假冒說話" and 目標:
-        await interaction.response.send_message(f"💬 機器人代替 <@{目標.id}> 說話 (內容由你輸入)", ephemeral=True)
-    
-    elif 功能 == "刪除訊息" and 數量:
-        deleted = await interaction.channel.purge(limit=min(數量, 100))
-        await interaction.response.send_message(f"✅ 已刪除 {len(deleted)} 則訊息", ephemeral=True)
+async def mini_domain(
+    interaction: discord.Interaction,
+    功能: str,
+    目標: discord.Member = None,
+    數量: int = None,
+    頻道: discord.TextChannel = None
+):
 
-elif 功能 == "設置違規懲罰頻道":
-    # 如果有選擇頻道，就用選擇的，否則用當前頻道
-    設置頻道 = 目標 if 目標 else interaction.channel
-    data["懲罰頻道"] = 設置頻道.id
-    save_data(data)
-    await interaction.response.send_message(
-        f"✅ 已設置 <#{設置頻道.id}> 為違規懲罰通知頻道", ephemeral=True
-    )
+    data = load_data()
+
+    # ----------------
+    # 違規排行榜
+    # ----------------
+    if 功能.startswith("違規排行榜"):
+
+        embed = discord.Embed(
+            title="📊 違規排行榜",
+            color=0x7a5cff,
+            timestamp=datetime.now(timezone.utc)
+        )
+
+        if 功能 == "違規排行榜本服":
+            if data["違規次數"]:
+                排行 = "\n".join(
+                    [f"<@{uid}>：{cnt}" for uid, cnt in data["違規次數"].items()]
+                )
+            else:
+                排行 = "無違規紀錄"
+
+            embed.description = 排行
+
+        else:
+            embed.description = "全服排行榜功能未啟用"
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # ----------------
+    # 假冒說話
+    # ----------------
+    elif 功能 == "假冒說話":
+
+        if not 目標:
+            await interaction.response.send_message(
+                "❌ 請選擇要假冒的成員",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.send_message(
+            f"💬 機器人將代替 <@{目標.id}> 發言（內容由你輸入）",
+            ephemeral=True
+        )
+
+    # ----------------
+    # 刪除訊息
+    # ----------------
+    elif 功能 == "刪除訊息":
+
+        if not 數量:
+            await interaction.response.send_message(
+                "❌ 請輸入要刪除的訊息數量",
+                ephemeral=True
+            )
+            return
+
+        deleted = await interaction.channel.purge(limit=min(數量, 100))
+
+        await interaction.response.send_message(
+            f"✅ 已刪除 {len(deleted)} 則訊息",
+            ephemeral=True
+        )
+
+    # ----------------
+    # 設置懲罰頻道
+    # ----------------
+    elif 功能 == "設置懲罰頻道":
+
+        設置頻道 = 頻道 if 頻道 else interaction.channel
+
+        data["懲罰頻道"] = 設置頻道.id
+        save_data(data)
+
+        await interaction.response.send_message(
+            f"✅ 已設置 <#{設置頻道.id}> 為違規懲罰通知頻道",
+            ephemeral=True
+        )
+
+    # ----------------
+    # 設置日誌頻道
+    # ----------------
+    elif 功能 == "設置日誌頻道":
+
+        設置頻道 = 頻道 if 頻道 else interaction.channel
+
+        data["日誌頻道"] = 設置頻道.id
+        save_data(data)
+
+        await interaction.response.send_message(
+            f"✅ 已設置 <#{設置頻道.id}> 為日誌頻道",
+            ephemeral=True
+        )
 # ----------------------------
 # /help 指令
 # ----------------------------
@@ -389,6 +646,7 @@ async def on_ready():
         reset_daily_violations.start()
 
 bot.run(DISCORD_TOKEN)
+
 
 
 
