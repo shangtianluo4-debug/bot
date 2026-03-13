@@ -70,11 +70,15 @@ def is_owner(interaction: discord.Interaction):
 # ----------------------------
 # 手動偵測不當詞語
 # ----------------------------
-不當詞 = ["操你", "白癡", "智障"]
+async def 偵測文字違規(text):
 
-for word in 不當詞:
-    if word in text:
-        return True, "不當文字"
+    不當詞 = ["操你", "白癡", "智障"]
+
+    for word in 不當詞:
+        if word in text:
+            return True, "不當文字"
+
+    return False, ""
 
 # ----------------------------
 # AI 偵測文字違規 (關鍵字或 Groq)
@@ -646,6 +650,7 @@ async def on_ready():
         reset_daily_violations.start()
 
 bot.run(DISCORD_TOKEN)
+
 
 
 
