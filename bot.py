@@ -212,6 +212,21 @@ async def on_message(message):
                     await 處理違規(message.author, message.guild, "疑似色情/不當圖片")
                     return
 
+# ----------------------------
+# 未驗證禁止發言
+# ----------------------------
+data = load_data()
+role_id = data.get("驗證身分組")
+
+if role_id:
+    role = message.guild.get_role(role_id)
+    if role and role not in message.author.roles:
+        try:
+            await message.delete()
+        except:
+            pass
+        return
+        
     await bot.process_commands(message)
 
 # ----------------------------
@@ -307,18 +322,98 @@ async def 設置懲罰日誌頻道(interaction: discord.Interaction, 頻道: dis
 # ----------------------------
 # 匿名說話
 # ----------------------------
-@bot.tree.command(name="匿名說話", description="開發者匿名代發訊息")
-@app_commands.check(is_developer)  # 只有開發者名單的人可以用
-@app_commands.describe(內容="請輸入要說的內容")
-async def 虛式茈(interaction: discord.Interaction, 內容: str):
-    # ephemeral 隱藏誰使用
-    await interaction.response.send_message(內容, ephemeral=True)
+@bot.tree.command(name="匿名發言", description="開發者匿名代發訊息")
+@app_commands.check(is_developer)
+@app_commands.describe(內容="要發送的內容", 頻道="要發送的頻道（可選）")
+async def 匿名發言(interaction: discord.Interaction, 內容: str, 頻道: discord.TextChannel = None):
 
-    # 可以直接發到當前頻道或特定頻道
-    發送頻道 = interaction.channel
+    await interaction.response.send_message("✅ 已發送", ephemeral=True)
 
-    # 實際發送訊息
-    await 發送頻道.send(內容)
+    發送頻道 = 頻道 or interaction.channel
+
+    embed = discord.Embed(
+        description=內容,
+        color=0x5865F2
+    )
+    embed.set_author(name="系統訊息")
+
+    await 發送頻道.send(embed=embed)
+
+# ----------------------------
+# 設置驗證身分組
+# ----------------------------
+@bot.tree.command(name="設置驗證身分組", description="設定驗證後給予的身分組")
+@app_commands.check(is_owner)
+@app_commands.describe(身分組="要給的身分組")
+async def 設置驗證身分組(interaction: discord.Interaction, 身分組: discord.Role):
+    data = load_data()
+    data["驗證身分組"] = 身分組.id
+    save_data(data)
+
+    await interaction.response.send_message(f"✅ 驗證身分組設為：{身分組.name}", ephemeral=True)
+
+# ----------------------------
+# 設置驗證頻道
+# ----------------------------
+@bot.tree.command(name="設置驗證頻道", description="設定驗證使用的頻道")
+@app_commands.check(is_owner)
+@app_commands.describe(頻道="驗證頻道")
+async def 設置驗證頻道(interaction: discord.Interaction, 頻道: discord.TextChannel):
+    data = load_data()
+    data["驗證頻道"] = 頻道.id
+    save_data(data)
+
+    await interaction.response.send_message(f"✅ 驗證頻道設為：{頻道.mention}", ephemeral=True)
+
+# ----------------------------
+# 發送驗證訊息
+# ----------------------------
+class 驗證按鈕(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="點我驗證", style=discord.ButtonStyle.green)
+    async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        role_id = data.get("驗證身分組")
+
+        if not role_id:
+            await interaction.response.send_message("❌ 尚未設置驗證身分組", ephemeral=True)
+            return
+
+        role = interaction.guild.get_role(role_id)
+        if not role:
+            await interaction.response.send_message("❌ 身分組不存在", ephemeral=True)
+            return
+
+        await interaction.user.add_roles(role)
+        await interaction.response.send_message("✅ 驗證成功！", ephemeral=True)
+
+# 指令
+@bot.tree.command(name="發送驗證", description="發送驗證按鈕")
+@app_commands.check(is_owner)
+async def 發送驗證(interaction: discord.Interaction):
+    data = load_data()
+    channel_id = data.get("驗證頻道")
+
+    if not channel_id:
+        await interaction.response.send_message("❌ 尚未設置驗證頻道", ephemeral=True)
+        return
+
+    channel = bot.get_channel(channel_id)
+    if not channel:
+        await interaction.response.send_message("❌ 找不到頻道", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="🔐 驗證系統",
+        description="點擊下方按鈕完成驗證",
+        color=0x00ff99
+    )
+
+    await channel.send(embed=embed, view=驗證按鈕())
+    await interaction.response.send_message("✅ 已發送驗證訊息", ephemeral=True)
+
 
 # ----------------------------
 # BOT 啟動事件
