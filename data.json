@@ -1,38 +1,7 @@
-import os
-import json
-
-DATA_FILE = "data.json"
-
-# 如果 data.json 不存在或格式錯誤，自動重置
-def init_data_file():
-    default_data = {
-        "白名單": [],
-        "黑名單": [],
-        "違規次數": {},
-        "懲罰頻道": None,
-        "日誌頻道": None,
-        "開發者名單": [],
-        "驗證身分組": None,
-        "驗證頻道": None,
-        "客服身分組": None,
-        "工單分類": None,
-        "工單紀錄": {}
-    }
-
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_data, f, ensure_ascii=False, indent=4)
-        print("data.json 不存在，已建立預設檔案。")
-        return
-
-    # 嘗試讀取 JSON，出錯則重置
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            json.load(f)
-    except Exception:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_data, f, ensure_ascii=False, indent=4)
-        print("data.json 損壞，已重置為預設內容。")
-
-# 啟動前先初始化
-init_data_file()
+{
+    "驗證身分組": null,
+    "驗證頻道": null,
+    "客服身分組": null,
+    "工單分類": null,
+    "工單紀錄": {}
+}
