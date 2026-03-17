@@ -18,29 +18,6 @@ intents.messages = True
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ----------------------------
-# 資料管理
-# ----------------------------
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump({
-            "白名單": [],
-            "黑名單": [],
-            "開發者名單": [OWNER_ID],
-            "違規次數": {},
-            "懲罰頻道": None,
-            "日誌頻道": None,
-            "bot_last_reset": str(datetime.now().date())
-        }, f, ensure_ascii=False, indent=4)
-
-def load_data():
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
 def is_owner(interaction: discord.Interaction):
     return interaction.user.id == OWNER_ID
 
@@ -48,6 +25,34 @@ def is_developer(interaction: discord.Interaction):
     data = load_data()
     return interaction.user.id in data.get("開發者名單", [])
 
+# ----------------------------
+# 資料管理
+# ----------------------------
+def init_data():
+    if not os.path.exists(DATA_FILE):
+        data = {
+            "黑名單": [],
+            "白名單": [],
+            "開發者名單": [],
+            "日誌頻道": None,
+            "懲罰日誌頻道": None,
+            "驗證身分組": None,
+            "驗證頻道": None,
+            "客服身分組": None,
+            "工單分類": None,
+            "工單紀錄": {}
+        }
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+def load_data():
+    init_data()
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 # ----------------------------
 # AI 偵測文字違規（Hugging Face Inference API）
 # ----------------------------
