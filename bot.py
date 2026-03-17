@@ -255,7 +255,7 @@ async def 黑名單加入(interaction: discord.Interaction, 目標: discord.Memb
     if 目標.id not in data["黑名單"]:
         data["黑名單"].append(目標.id)
         save_data(data)
-        await interaction.response.send_message(f"✅ 已加入黑名單：<@{目標.id}>", ephemeral=True)
+    await interaction.response.send_message(f"✅ 已加入黑名單：<@{目標.id}>", ephemeral=True)
 
 @bot.tree.command(name="黑名單移除", description="將成員從黑名單移除")
 @app_commands.checks.has_permissions(administrator=True)
@@ -265,7 +265,7 @@ async def 黑名單移除(interaction: discord.Interaction, 目標: discord.Memb
     if 目標.id in data["黑名單"]:
         data["黑名單"].remove(目標.id)
         save_data(data)
-        await interaction.response.send_message(f"✅ 已移除黑名單：<@{目標.id}>", ephemeral=True)
+    await interaction.response.send_message(f"✅ 已移除黑名單：<@{目標.id}>", ephemeral=True)
 
 @bot.tree.command(name="白名單加入", description="將成員加入白名單")
 @app_commands.checks.has_permissions(administrator=True)
@@ -275,7 +275,7 @@ async def 白名單加入(interaction: discord.Interaction, 目標: discord.Memb
     if 目標.id not in data["白名單"]:
         data["白名單"].append(目標.id)
         save_data(data)
-        await interaction.response.send_message(f"✅ 已加入白名單：<@{目標.id}>", ephemeral=True)
+    await interaction.response.send_message(f"✅ 已加入白名單：<@{目標.id}>", ephemeral=True)
 
 @bot.tree.command(name="白名單移除", description="將成員從白名單移除")
 @app_commands.checks.has_permissions(administrator=True)
@@ -285,54 +285,7 @@ async def 白名單移除(interaction: discord.Interaction, 目標: discord.Memb
     if 目標.id in data["白名單"]:
         data["白名單"].remove(目標.id)
         save_data(data)
-        await interaction.response.send_message(f"✅ 已移除白名單：<@{目標.id}>", ephemeral=True)
-
-# ----------------------------
-# 開發者名單管理
-# ----------------------------
-@bot.tree.command(name="設定開發者", description="新增開發者權限（只有創作者可用）")
-@app_commands.check(is_owner)
-@app_commands.describe(目標="選擇成員")
-async def 設定開發者(interaction: discord.Interaction, 目標: discord.Member):
-    data = load_data()
-    if 目標.id not in data["開發者名單"]:
-        data["開發者名單"].append(目標.id)
-        save_data(data)
-        await interaction.response.send_message(f"✅ 已賦予 <@{目標.id}> 開發者權限", ephemeral=True)
-
-# ----------------------------
-# 日誌頻道設置
-# ----------------------------
-@bot.tree.command(name="設置日誌頻道", description="設定日誌通知頻道")
-@app_commands.check(is_owner)
-@app_commands.describe(頻道="選擇頻道（可選）")
-async def 設置日誌頻道(interaction: discord.Interaction, 頻道: discord.TextChannel=None):
-    data = load_data()
-    設置頻道 = 頻道 or interaction.channel
-    data["日誌頻道"] = 設置頻道.id
-    save_data(data)
-    await interaction.response.send_message(f"✅ 已將日誌頻道設為：{設置頻道.mention}", ephemeral=True)
-
-# ----------------------------
-# 設置懲罰日誌頻道
-# ----------------------------
-@bot.tree.command(name="設置懲罰日誌頻道", description="設定違規懲罰通知頻道")
-@app_commands.check(is_owner)
-@app_commands.describe(頻道="選擇頻道（可選，預設當前頻道）")
-async def 設置懲罰日誌頻道(interaction: discord.Interaction, 頻道: discord.TextChannel=None):
-    data = load_data()
-    設置頻道 = 頻道 or interaction.channel
-    data["懲罰日誌頻道"] = 設置頻道.id
-    save_data(data)
-    await interaction.response.send_message(f"✅ 已將懲罰日誌頻道設為：{設置頻道.mention}", ephemeral=True)
-
-# ----------------------------
-# 匿名說話
-# ----------------------------
-@bot.tree.command(name="匿名發言", description="開發者匿名代發訊息")
-@app_commands.check(is_developer)
-@app_commands.describe(內容="要發送的內容", 頻道="要發送的頻道（可選）")
-async def 匿名發言(interaction: discord.Interaction, 內容: str, 頻道: discord.TextChannel = None):
+    await interaction.response.send_message(f"✅ 已移除白名單：<@{目標.id}>", ephemeral=True)
 
     await interaction.response.send_message("✅ 已發送", ephemeral=True)
 
@@ -347,7 +300,66 @@ async def 匿名發言(interaction: discord.Interaction, 內容: str, 頻道: di
     await 發送頻道.send(embed=embed)
 
 # ----------------------------
-# 設置驗證身分組
+# 開發者名單管理
+# ----------------------------
+@bot.tree.command(name="設定開發者", description="新增開發者權限（只有創作者可用）")
+@app_commands.check(is_owner)
+@app_commands.describe(目標="選擇成員")
+async def 設定開發者(interaction: discord.Interaction, 目標: discord.Member):
+    data = load_data()
+    if 目標.id not in data["開發者名單"]:
+        data["開發者名單"].append(目標.id)
+        save_data(data)
+    await interaction.response.send_message(f"✅ 已賦予 <@{目標.id}> 開發者權限", ephemeral=True)
+
+@bot.tree.command(name="查看開發者", description="查看所有開發者")
+@app_commands.check(is_owner)
+async def 查看開發者(interaction: discord.Interaction):
+    data = load_data()
+    devs = ", ".join([f"<@{i}>" for i in data["開發者名單"]]) or "無"
+    await interaction.response.send_message(f"開發者名單：{devs}", ephemeral=True)
+
+
+# ----------------------------
+# 日誌頻道
+# ----------------------------
+@bot.tree.command(name="設置日誌頻道", description="設定日誌通知頻道")
+@app_commands.check(is_owner)
+@app_commands.describe(頻道="選擇頻道（可選）")
+async def 設置日誌頻道(interaction: discord.Interaction, 頻道: discord.TextChannel = None):
+    data = load_data()
+    設置頻道 = 頻道 or interaction.channel
+    data["日誌頻道"] = 設置頻道.id
+    save_data(data)
+    await interaction.response.send_message(f"✅ 已將日誌頻道設為：{設置頻道.mention}", ephemeral=True)
+
+@bot.tree.command(name="設置懲罰日誌頻道", description="設定違規懲罰通知頻道")
+@app_commands.check(is_owner)
+@app_commands.describe(頻道="選擇頻道（可選）")
+async def 設置懲罰日誌頻道(interaction: discord.Interaction, 頻道: discord.TextChannel = None):
+    data = load_data()
+    設置頻道 = 頻道 or interaction.channel
+    data["懲罰日誌頻道"] = 設置頻道.id
+    save_data(data)
+    await interaction.response.send_message(f"✅ 已將懲罰日誌頻道設為：{設置頻道.mention}", ephemeral=True)
+
+
+# ----------------------------
+# 匿名發言
+# ----------------------------
+@bot.tree.command(name="匿名發言", description="開發者匿名代發訊息")
+@app_commands.check(is_developer)
+@app_commands.describe(內容="要發送的內容", 頻道="要發送的頻道（可選）")
+async def 匿名發言(interaction: discord.Interaction, 內容: str, 頻道: discord.TextChannel = None):
+    await interaction.response.send_message("✅ 已發送", ephemeral=True)
+    發送頻道 = 頻道 or interaction.channel
+    embed = discord.Embed(description=內容, color=0x5865F2)
+    embed.set_author(name="系統訊息")
+    await 發送頻道.send(embed=embed)
+
+
+# ----------------------------
+# 驗證系統
 # ----------------------------
 @bot.tree.command(name="設置驗證身分組", description="設定驗證後給予的身分組")
 @app_commands.check(is_owner)
@@ -356,12 +368,8 @@ async def 設置驗證身分組(interaction: discord.Interaction, 身分組: dis
     data = load_data()
     data["驗證身分組"] = 身分組.id
     save_data(data)
-
     await interaction.response.send_message(f"✅ 驗證身分組設為：{身分組.name}", ephemeral=True)
 
-# ----------------------------
-# 設置驗證頻道
-# ----------------------------
 @bot.tree.command(name="設置驗證頻道", description="設定驗證使用的頻道")
 @app_commands.check(is_owner)
 @app_commands.describe(頻道="驗證頻道")
@@ -369,60 +377,45 @@ async def 設置驗證頻道(interaction: discord.Interaction, 頻道: discord.T
     data = load_data()
     data["驗證頻道"] = 頻道.id
     save_data(data)
-
     await interaction.response.send_message(f"✅ 驗證頻道設為：{頻道.mention}", ephemeral=True)
 
-# ----------------------------
-# 發送驗證訊息
-# ----------------------------
+
 class 驗證按鈕(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
     @discord.ui.button(label="點我驗證", style=discord.ButtonStyle.green)
     async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         role_id = data.get("驗證身分組")
-
         if not role_id:
             await interaction.response.send_message("❌ 尚未設置驗證身分組", ephemeral=True)
             return
-
         role = interaction.guild.get_role(role_id)
         if not role:
             await interaction.response.send_message("❌ 身分組不存在", ephemeral=True)
             return
-
         await interaction.user.add_roles(role)
         await interaction.response.send_message("✅ 驗證成功！", ephemeral=True)
 
-# 指令
 @bot.tree.command(name="發送驗證", description="發送驗證按鈕")
 @app_commands.check(is_owner)
 async def 發送驗證(interaction: discord.Interaction):
     data = load_data()
     channel_id = data.get("驗證頻道")
-
     if not channel_id:
         await interaction.response.send_message("❌ 尚未設置驗證頻道", ephemeral=True)
         return
-
     channel = bot.get_channel(channel_id)
     if not channel:
         await interaction.response.send_message("❌ 找不到頻道", ephemeral=True)
         return
-
-    embed = discord.Embed(
-        title="🔐 驗證系統",
-        description="點擊下方按鈕完成驗證",
-        color=0x00ff99
-    )
-
+    embed = discord.Embed(title="🔐 驗證系統", description="點擊下方按鈕完成驗證", color=0x00ff99)
     await channel.send(embed=embed, view=驗證按鈕())
     await interaction.response.send_message("✅ 已發送驗證訊息", ephemeral=True)
 
+
 # ----------------------------
-# 設置客服身分組
+# 客服 & 工單系統
 # ----------------------------
 @bot.tree.command(name="設置客服身分組", description="設定客服可查看工單")
 @app_commands.check(is_owner)
@@ -430,114 +423,74 @@ async def 設置客服身分組(interaction: discord.Interaction, 身分組: dis
     data = load_data()
     data["客服身分組"] = 身分組.id
     save_data(data)
-
     await interaction.response.send_message(f"✅ 客服身分組設為：{身分組.name}", ephemeral=True)
 
-# ----------------------------
-# 工單按鈕
-# ----------------------------
+
 class 工單按鈕(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
     @discord.ui.button(label="🎫 開啟工單", style=discord.ButtonStyle.green)
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         uid = str(interaction.user.id)
-
-        # 防止重複開單
         if uid in data["工單紀錄"]:
             await interaction.response.send_message("❌ 你已經有工單了！", ephemeral=True)
             return
-
         guild = interaction.guild
-
-        # 權限設定
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
-
-        # 客服身分組
         role_id = data.get("客服身分組")
         if role_id:
             role = guild.get_role(role_id)
             if role:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-
-        # 建立頻道
-        channel = await guild.create_text_channel(
-            name=f"ticket-{interaction.user.name}",
-            overwrites=overwrites
-        )
-
-        # 紀錄
+        channel = await guild.create_text_channel(name=f"ticket-{interaction.user.name}", overwrites=overwrites)
         data["工單紀錄"][uid] = channel.id
         save_data(data)
-
         await channel.send(f"{interaction.user.mention} 🎫 工單已建立，請描述你的問題")
         await interaction.response.send_message(f"✅ 工單已建立：{channel.mention}", ephemeral=True)
 
-# 發送按鈕
+
 @bot.tree.command(name="發送工單", description="發送工單按鈕")
 @app_commands.check(is_owner)
 async def 發送工單(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🎫 客服系統",
-        description="點擊下方按鈕建立工單",
-        color=0x00ff99
-    )
-
+    embed = discord.Embed(title="🎫 客服系統", description="點擊下方按鈕建立工單", color=0x00ff99)
     await interaction.channel.send(embed=embed, view=工單按鈕())
     await interaction.response.send_message("✅ 已發送工單按鈕", ephemeral=True)
 
-# ----------------------------
-# 關閉工單
-# ----------------------------
+
 @bot.tree.command(name="關閉工單", description="關閉此工單")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def 關閉工單(interaction: discord.Interaction):
-
     data = load_data()
     channel_id = interaction.channel.id
-
-    # 找對應使用者
     user_id = None
     for uid, cid in data["工單紀錄"].items():
         if cid == channel_id:
             user_id = uid
             break
-
     if not user_id:
         await interaction.response.send_message("❌ 這不是工單頻道", ephemeral=True)
         return
-
-    # 刪除紀錄
     del data["工單紀錄"][user_id]
     save_data(data)
-
     await interaction.response.send_message("🗑️ 工單已關閉")
     await interaction.channel.delete()
 
-# ----------------------------
-# 加入人員
-# ----------------------------
+
 @bot.tree.command(name="加入人員", description="加入人員到工單")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def 加入人員(interaction: discord.Interaction, 成員: discord.Member):
     await interaction.channel.set_permissions(成員, view_channel=True, send_messages=True)
     await interaction.response.send_message(f"✅ 已加入 {成員.mention}")
 
-# ----------------------------
-# 移除人員
-# ----------------------------
 @bot.tree.command(name="移除人員", description="移除人員")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def 移除人員(interaction: discord.Interaction, 成員: discord.Member):
     await interaction.channel.set_permissions(成員, overwrite=None)
     await interaction.response.send_message(f"✅ 已移除 {成員.mention}")
-
-
 # ----------------------------
 # BOT 啟動事件
 # ----------------------------
