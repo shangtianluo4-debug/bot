@@ -421,6 +421,122 @@ async def 發送驗證(interaction: discord.Interaction):
     await channel.send(embed=embed, view=驗證按鈕())
     await interaction.response.send_message("✅ 已發送驗證訊息", ephemeral=True)
 
+# ----------------------------
+# 設置客服身分組
+# ----------------------------
+@bot.tree.command(name="設置客服身分組", description="設定客服可查看工單")
+@app_commands.check(is_owner)
+async def 設置客服身分組(interaction: discord.Interaction, 身分組: discord.Role):
+    data = load_data()
+    data["客服身分組"] = 身分組.id
+    save_data(data)
+
+    await interaction.response.send_message(f"✅ 客服身分組設為：{身分組.name}", ephemeral=True)
+
+# ----------------------------
+# 工單按鈕
+# ----------------------------
+class 工單按鈕(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🎫 開啟工單", style=discord.ButtonStyle.green)
+    async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        uid = str(interaction.user.id)
+
+        # 防止重複開單
+        if uid in data["工單紀錄"]:
+            await interaction.response.send_message("❌ 你已經有工單了！", ephemeral=True)
+            return
+
+        guild = interaction.guild
+
+        # 權限設定
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+
+        # 客服身分組
+        role_id = data.get("客服身分組")
+        if role_id:
+            role = guild.get_role(role_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
+        # 建立頻道
+        channel = await guild.create_text_channel(
+            name=f"ticket-{interaction.user.name}",
+            overwrites=overwrites
+        )
+
+        # 紀錄
+        data["工單紀錄"][uid] = channel.id
+        save_data(data)
+
+        await channel.send(f"{interaction.user.mention} 🎫 工單已建立，請描述你的問題")
+        await interaction.response.send_message(f"✅ 工單已建立：{channel.mention}", ephemeral=True)
+
+# 發送按鈕
+@bot.tree.command(name="發送工單", description="發送工單按鈕")
+@app_commands.check(is_owner)
+async def 發送工單(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🎫 客服系統",
+        description="點擊下方按鈕建立工單",
+        color=0x00ff99
+    )
+
+    await interaction.channel.send(embed=embed, view=工單按鈕())
+    await interaction.response.send_message("✅ 已發送工單按鈕", ephemeral=True)
+
+# ----------------------------
+# 關閉工單
+# ----------------------------
+@bot.tree.command(name="關閉工單", description="關閉此工單")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def 關閉工單(interaction: discord.Interaction):
+
+    data = load_data()
+    channel_id = interaction.channel.id
+
+    # 找對應使用者
+    user_id = None
+    for uid, cid in data["工單紀錄"].items():
+        if cid == channel_id:
+            user_id = uid
+            break
+
+    if not user_id:
+        await interaction.response.send_message("❌ 這不是工單頻道", ephemeral=True)
+        return
+
+    # 刪除紀錄
+    del data["工單紀錄"][user_id]
+    save_data(data)
+
+    await interaction.response.send_message("🗑️ 工單已關閉")
+    await interaction.channel.delete()
+
+# ----------------------------
+# 加入人員
+# ----------------------------
+@bot.tree.command(name="加入人員", description="加入人員到工單")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def 加入人員(interaction: discord.Interaction, 成員: discord.Member):
+    await interaction.channel.set_permissions(成員, view_channel=True, send_messages=True)
+    await interaction.response.send_message(f"✅ 已加入 {成員.mention}")
+
+# ----------------------------
+# 移除人員
+# ----------------------------
+@bot.tree.command(name="移除人員", description="移除人員")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def 移除人員(interaction: discord.Interaction, 成員: discord.Member):
+    await interaction.channel.set_permissions(成員, overwrite=None)
+    await interaction.response.send_message(f"✅ 已移除 {成員.mention}")
+
 
 # ----------------------------
 # BOT 啟動事件
