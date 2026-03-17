@@ -182,53 +182,60 @@ async def on_message(message):
     data = load_data()
     uid = message.author.id
 
-    # 白名單跳過偵測
+    # 白名單跳過所有檢查
     if uid in data["白名單"]:
         await bot.process_commands(message)
         return
 
-    # 黑名單刪除訊息
+    # ----------------
+    # 驗證系統（未驗證禁止發言）
+    # ----------------
+    role_id = data.get("驗證身分組")
+    if role_id:
+        role = message.guild.get_role(role_id)
+        if role and role not in message.author.roles:
+            try:
+                await message.delete()
+            except:
+                pass
+            return
+
+    # 黑名單直接刪訊息
     if uid in data["黑名單"]:
-        try: await message.delete()
-        except: pass
-        return
-
-    # 文字違規
-    違規, 原因 = await 偵測文字違規(message.content)
-    if 違規:
-        try: await message.delete()
-        except: pass
-        await 處理違規(message.author, message.guild, 原因)
-        return
-
-    # 圖片違規
-    if message.attachments:
-        for att in message.attachments:
-            if att.content_type and "image" in att.content_type:
-                flag = await 偵測圖片違規(att.url)
-                if flag:
-                    try: await message.delete()
-                    except: pass
-                    await 處理違規(message.author, message.guild, "疑似色情/不當圖片")
-                    return
-
-# ----------------------------
-# 未驗證禁止發言
-# ----------------------------
-data = load_data()
-role_id = data.get("驗證身分組")
-
-if role_id:
-    role = message.guild.get_role(role_id)
-    if role and role not in message.author.roles:
         try:
             await message.delete()
         except:
             pass
         return
-        
-    await bot.process_commands(message)
 
+    # ----------------
+    # 文字違規
+    # ----------------
+    違規, 原因 = await 偵測文字違規(message.content)
+    if 違規:
+        try:
+            await message.delete()
+        except:
+            pass
+        await 處理違規(message.author, message.guild, 原因)
+        return
+
+    # ----------------
+    # 圖片違規
+    # ----------------
+    if message.attachments:
+        for att in message.attachments:
+            if att.content_type and "image" in att.content_type:
+                flag = await 偵測圖片違規(att.url)
+                if flag:
+                    try:
+                        await message.delete()
+                    except:
+                        pass
+                    await 處理違規(message.author, message.guild, "疑似色情/不當圖片")
+                    return
+
+    await bot.process_commands(message)
 # ----------------------------
 # 黑白名單管理
 # ----------------------------
