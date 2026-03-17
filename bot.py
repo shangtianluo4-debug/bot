@@ -543,9 +543,13 @@ async def 移除人員(interaction: discord.Interaction, 成員: discord.Member)
 # ----------------------------
 @bot.event
 async def on_ready():
-    await bot.tree.sync()  # 同步指令
+    await bot.tree.sync()
     print(f"Logged in as {bot.user} (五條悟 BOT 已啟動)")
 
+# ----------------------------
+# 啟動 BOT
+# ----------------------------
+bot.run(TOKEN)
 
 
 
