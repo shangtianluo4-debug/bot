@@ -9,7 +9,7 @@ import json, os, aiohttp
 # ----------------------------
 TOKEN = os.getenv("DISCORD_TOKEN")
 HF_KEY = os.getenv("HF_API_KEY")  # Hugging Face Inference API
-OWNER_ID = "OWNER_ID"   # 你自己
+OWNER_ID = int(os.getenv("OWNER_ID"))   # 你自己
 DATA_FILE = "data.json"
 BOT_VERSION = "v1.0.0"
 
