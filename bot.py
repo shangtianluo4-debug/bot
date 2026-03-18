@@ -249,15 +249,33 @@ async def on_message(message):
 @bot.event
 async def on_member_join(member: discord.Member):
     data = load_data()
-    role_id = data.get("未驗證身分組")
+    role_id = data.get("自動賦予身分組")  # 你可以用指令設置這個欄位
     if role_id:
         role = member.guild.get_role(role_id)
         if role:
-            await member.add_roles(role)
+            try:
+                await member.add_roles(role)
+                # 可選：發送歡迎訊息
+                welcome_channel_id = data.get("驗證頻道") or data.get("日誌頻道")
+                if welcome_channel_id:
+                    channel = member.guild.get_channel(welcome_channel_id)
+                    if channel:
+                        await channel.send(f"🎉 歡迎 {member.mention}！已自動賦予 {role.name} 身分組")
+            except Exception as e:
+                print(f"自動賦予身分組失敗: {e}")
+
 
 # ----------------------------
-# 指令
+# 身分
 # ----------------------------
+@bot.tree.command(name="設置自動身分組", description="設定新成員自動獲得的身分組")
+@app_commands.check(is_owner)
+@app_commands.describe(身分組="要自動賦予的身分組")
+async def 設置自動身分組(interaction: discord.Interaction, 身分組: discord.Role):
+    data = load_data()
+    data["自動賦予身分組"] = 身分組.id
+    save_data(data)
+    await interaction.response.send_message(f"✅ 新成員將自動獲得身分組：{身分組.name}", ephemeral=True)
 # ----------------------------
 # 黑白名單管理
 # ----------------------------
