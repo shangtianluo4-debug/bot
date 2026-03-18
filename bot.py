@@ -35,7 +35,7 @@ def init_data():
     default_data = {
         "黑名單": [],
         "白名單": [],
-        "開發者名單": [],
+        "開發者名單": [1442017307332182168],
         "日誌頻道": None,
         "懲罰日誌頻道": None,
         "驗證身分組": None,
@@ -354,14 +354,13 @@ async def 查看開發者(interaction: discord.Interaction):
 @app_commands.check(is_owner)
 @app_commands.describe(頻道="選擇頻道（可選）")
 async def 設置日誌頻道(interaction: discord.Interaction, 頻道: discord.TextChannel = None):
-    設置頻道 = 頻道 or interaction.channel
-    if not 設置頻道:
-        await interaction.response.send_message("❌ 找不到頻道", ephemeral=True)
-        return
+    await interaction.response.defer(ephemeral=True)  # ✅ 立即延長
     data = load_data()
+    設置頻道 = 頻道 or interaction.channel
     data["日誌頻道"] = 設置頻道.id
     save_data(data)
-    await interaction.response.send_message(f"✅ 日誌頻道設為：{設置頻道.mention}", ephemeral=True)
+    await interaction.followup.send(f"✅ 已將日誌頻道設為：{設置頻道.mention}", ephemeral=True)
+
 
 @bot.tree.command(name="設置懲罰日誌頻道", description="設定違規懲罰通知頻道")
 @app_commands.check(is_owner)
