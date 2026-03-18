@@ -1,23 +1,26 @@
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
-from datetime import datetime, timezone, timedelta
-import json, os, aiohttp
+from datetime import datetime, timezone
+import os, json, aiohttp
 
 # ----------------------------
 # 基本設定
 # ----------------------------
 TOKEN = os.getenv("DISCORD_TOKEN")
-HF_KEY = os.getenv("HF_API_KEY")  # Hugging Face Inference API
-OWNER_ID = int(os.getenv("OWNER_ID"))   # 你自己
+HF_KEY = os.getenv("HF_API_KEY")
+OWNER_ID = int(os.getenv("OWNER_ID"))
 DATA_FILE = "data.json"
-BOT_VERSION = "v1.0.0"
 
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# ----------------------------
+# 檢查函數
+# ----------------------------
 def is_owner(interaction: discord.Interaction):
     return interaction.user.id == OWNER_ID
 
@@ -25,41 +28,39 @@ def is_developer(interaction: discord.Interaction):
     data = load_data()
     return interaction.user.id in data.get("開發者名單", [])
 
+# ----------------------------
+# 資料管理
+# ----------------------------
 def init_data():
     default_data = {
         "黑名單": [],
         "白名單": [],
-        "開發者名單": [1442017307332182168],
+        "開發者名單": [],
         "日誌頻道": None,
         "懲罰日誌頻道": None,
         "驗證身分組": None,
         "驗證頻道": None,
-        "未驗證身分組": None,  # ✅ 新增
+        "未驗證身分組": None,
         "客服身分組": None,
         "工單分類": None,
-        "工單紀錄": {}
+        "工單紀錄": {},
+        "違規次數": {},
+        "bot_last_reset": ""
     }
-
-    # 如果檔案不存在 → 建立
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(default_data, f, indent=4, ensure_ascii=False)
         return
-
-    # 如果存在 → 檢查缺少欄位
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         try:
             data = json.load(f)
         except:
             data = {}
-
     changed = False
-
     for key, value in default_data.items():
         if key not in data:
             data[key] = value
             changed = True
-
     if changed:
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
@@ -68,22 +69,23 @@ def load_data():
     init_data()
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
 # ----------------------------
-# AI 偵測文字違規（Hugging Face Inference API）
+# AI 文字違規偵測
 # ----------------------------
 async def 偵測文字違規(text):
-    # 本地關鍵字快速過濾
     髒話 = ["幹","白癡","垃圾","智障","靠北","髒話"]
     for w in 髒話:
         if w in text.lower():
             return True, f"含髒話：{w}"
-
     if not HF_KEY:
         return False, ""
-
     headers = {"Authorization": f"Bearer {HF_KEY}"}
     payload = {"inputs": text}
-
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(
@@ -92,7 +94,6 @@ async def 偵測文字違規(text):
                 json=payload
             ) as resp:
                 res = await resp.json()
-                # 解析結果
                 if isinstance(res, dict) and "error" in res:
                     return False, ""
                 for label in res[0]:
@@ -101,11 +102,10 @@ async def 偵測文字違規(text):
         except Exception as e:
             print("HF AI 偵測錯誤:", e)
             return False, ""
-
     return False, ""
 
 # ----------------------------
-# AI 偵測圖片違規（DeepAI NSFW）
+# AI 圖片違規偵測
 # ----------------------------
 async def 偵測圖片違規(url):
     key = os.getenv("DEEPAI_API_KEY")
@@ -134,27 +134,22 @@ async def 處理違規(user: discord.Member, guild: discord.Guild, 原因: str):
     uid = str(user.id)
     data["違規次數"][uid] = data["違規次數"].get(uid, 0) + 1
 
-    # 第一次警告
     if data["違規次數"][uid] == 1:
         原因 += "（首次警告）"
-
-    # 累積三次禁言 60 秒
     elif data["違規次數"][uid] == 3:
         try:
             await user.timeout(duration=60)
             原因 += "（累積三次禁言60秒）"
         except Exception as e:
             print(f"禁言失敗: {e}")
-
-    # 累積五次自動加入黑名單
     elif data["違規次數"][uid] >= 5 and user.id not in data["黑名單"]:
         data["黑名單"].append(user.id)
         原因 += "（累積五次自動封鎖）"
 
     save_data(data)
 
-    # 發送懲罰通知到懲罰頻道
-    頻道ID = data.get("懲罰頻道")
+    # 發送懲罰頻道
+    頻道ID = data.get("懲罰日誌頻道")
     if 頻道ID:
         channel = bot.get_channel(頻道ID)
         if channel:
@@ -166,16 +161,15 @@ async def 處理違規(user: discord.Member, guild: discord.Guild, 原因: str):
             )
             await channel.send(embed=embed)
 
-    # 發送日誌訊息到日誌頻道
+    # 發送日誌頻道
     log_channel_id = data.get("日誌頻道")
     if log_channel_id:
         log_channel = bot.get_channel(log_channel_id)
         if log_channel:
             await log_channel.send(f"[LOG] {user} 違規: {原因} (累計 {data['違規次數'][uid]})")
 
-
 # ----------------------------
-# 每天午夜重置違規次數
+# 每日重置違規
 # ----------------------------
 @tasks.loop(minutes=60)
 async def 每日重置違規():
@@ -202,25 +196,22 @@ async def on_message(message):
     data = load_data()
     uid = message.author.id
 
-    # 白名單跳過所有檢查
     if uid in data["白名單"]:
         await bot.process_commands(message)
         return
 
-    # ----------------
-    # 驗證系統（未驗證禁止發言）
-    # ----------------
-    role_id = data.get("驗證身分組")
-    if role_id:
-        role = message.guild.get_role(role_id)
-        if role and role not in message.author.roles:
+    # 驗證系統
+    verify_role_id = data.get("驗證身分組")
+    if verify_role_id:
+        verify_role = message.guild.get_role(verify_role_id)
+        if verify_role and verify_role not in message.author.roles:
             try:
                 await message.delete()
             except:
                 pass
             return
 
-    # 黑名單直接刪訊息
+    # 黑名單刪訊息
     if uid in data["黑名單"]:
         try:
             await message.delete()
@@ -228,9 +219,7 @@ async def on_message(message):
             pass
         return
 
-    # ----------------
     # 文字違規
-    # ----------------
     違規, 原因 = await 偵測文字違規(message.content)
     if 違規:
         try:
@@ -240,22 +229,35 @@ async def on_message(message):
         await 處理違規(message.author, message.guild, 原因)
         return
 
-    # ----------------
     # 圖片違規
-    # ----------------
-    if message.attachments:
-        for att in message.attachments:
-            if att.content_type and "image" in att.content_type:
-                flag = await 偵測圖片違規(att.url)
-                if flag:
-                    try:
-                        await message.delete()
-                    except:
-                        pass
-                    await 處理違規(message.author, message.guild, "疑似色情/不當圖片")
-                    return
+    for att in message.attachments:
+        if att.content_type and "image" in att.content_type:
+            flag = await 偵測圖片違規(att.url)
+            if flag:
+                try:
+                    await message.delete()
+                except:
+                    pass
+                await 處理違規(message.author, message.guild, "疑似色情/不當圖片")
+                return
 
     await bot.process_commands(message)
+
+# ----------------------------
+# 成員加入自動賦予身分組
+# ----------------------------
+@bot.event
+async def on_member_join(member: discord.Member):
+    data = load_data()
+    role_id = data.get("未驗證身分組")
+    if role_id:
+        role = member.guild.get_role(role_id)
+        if role:
+            await member.add_roles(role)
+
+# ----------------------------
+# 指令
+# ----------------------------
 # ----------------------------
 # 黑白名單管理
 # ----------------------------
@@ -307,18 +309,6 @@ async def 白名單移除(interaction: discord.Interaction, 目標: discord.Memb
         save_data(data)
     await interaction.response.send_message(f"✅ 已移除白名單：<@{目標.id}>", ephemeral=True)
 
-    await interaction.response.send_message("✅ 已發送", ephemeral=True)
-
-    發送頻道 = 頻道 or interaction.channel
-
-    embed = discord.Embed(
-        description=內容,
-        color=0x5865F2
-    )
-    embed.set_author(name="系統訊息")
-
-    await 發送頻道.send(embed=embed)
-
 # ----------------------------
 # 開發者名單管理
 # ----------------------------
@@ -339,44 +329,50 @@ async def 查看開發者(interaction: discord.Interaction):
     devs = ", ".join([f"<@{i}>" for i in data["開發者名單"]]) or "無"
     await interaction.response.send_message(f"開發者名單：{devs}", ephemeral=True)
 
-
 # ----------------------------
-# 日誌頻道
+# 日誌頻道管理
 # ----------------------------
 @bot.tree.command(name="設置日誌頻道", description="設定日誌通知頻道")
 @app_commands.check(is_owner)
 @app_commands.describe(頻道="選擇頻道（可選）")
 async def 設置日誌頻道(interaction: discord.Interaction, 頻道: discord.TextChannel = None):
-    data = load_data()
     設置頻道 = 頻道 or interaction.channel
+    if not 設置頻道:
+        await interaction.response.send_message("❌ 找不到頻道", ephemeral=True)
+        return
+    data = load_data()
     data["日誌頻道"] = 設置頻道.id
     save_data(data)
-    await interaction.response.send_message(f"✅ 已將日誌頻道設為：{設置頻道.mention}", ephemeral=True)
+    await interaction.response.send_message(f"✅ 日誌頻道設為：{設置頻道.mention}", ephemeral=True)
 
 @bot.tree.command(name="設置懲罰日誌頻道", description="設定違規懲罰通知頻道")
 @app_commands.check(is_owner)
 @app_commands.describe(頻道="選擇頻道（可選）")
 async def 設置懲罰日誌頻道(interaction: discord.Interaction, 頻道: discord.TextChannel = None):
-    data = load_data()
     設置頻道 = 頻道 or interaction.channel
+    if not 設置頻道:
+        await interaction.response.send_message("❌ 找不到頻道", ephemeral=True)
+        return
+    data = load_data()
     data["懲罰日誌頻道"] = 設置頻道.id
     save_data(data)
-    await interaction.response.send_message(f"✅ 已將懲罰日誌頻道設為：{設置頻道.mention}", ephemeral=True)
-
+    await interaction.response.send_message(f"✅ 懲罰日誌頻道設為：{設置頻道.mention}", ephemeral=True)
 
 # ----------------------------
-# 匿名發言
+# 匿名發言（開發者）
 # ----------------------------
 @bot.tree.command(name="匿名發言", description="開發者匿名代發訊息")
 @app_commands.check(is_developer)
 @app_commands.describe(內容="要發送的內容", 頻道="要發送的頻道（可選）")
 async def 匿名發言(interaction: discord.Interaction, 內容: str, 頻道: discord.TextChannel = None):
-    await interaction.response.send_message("✅ 已發送", ephemeral=True)
     發送頻道 = 頻道 or interaction.channel
+    if not 發送頻道:
+        await interaction.response.send_message("❌ 找不到頻道", ephemeral=True)
+        return
     embed = discord.Embed(description=內容, color=0x5865F2)
     embed.set_author(name="系統訊息")
     await 發送頻道.send(embed=embed)
-
+    await interaction.response.send_message("✅ 已發送", ephemeral=True)
 
 # ----------------------------
 # 驗證系統
@@ -390,6 +386,15 @@ async def 設置驗證身分組(interaction: discord.Interaction, 身分組: dis
     save_data(data)
     await interaction.response.send_message(f"✅ 驗證身分組設為：{身分組.name}", ephemeral=True)
 
+@bot.tree.command(name="設置未驗證身分組", description="設定未驗證角色（驗證後會移除）")
+@app_commands.check(is_owner)
+@app_commands.describe(身分組="未驗證身分組")
+async def 設置未驗證身分組(interaction: discord.Interaction, 身分組: discord.Role):
+    data = load_data()
+    data["未驗證身分組"] = 身分組.id
+    save_data(data)
+    await interaction.response.send_message(f"✅ 未驗證身分組設為：{身分組.name}", ephemeral=True)
+
 @bot.tree.command(name="設置驗證頻道", description="設定驗證使用的頻道")
 @app_commands.check(is_owner)
 @app_commands.describe(頻道="驗證頻道")
@@ -399,7 +404,6 @@ async def 設置驗證頻道(interaction: discord.Interaction, 頻道: discord.T
     save_data(data)
     await interaction.response.send_message(f"✅ 驗證頻道設為：{頻道.mention}", ephemeral=True)
 
-
 class 驗證按鈕(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -408,7 +412,6 @@ class 驗證按鈕(discord.ui.View):
     async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         role_id = data.get("驗證身分組")
-
         if not role_id:
             await interaction.response.send_message("❌ 尚未設置驗證身分組", ephemeral=True)
             return
@@ -418,7 +421,7 @@ class 驗證按鈕(discord.ui.View):
             await interaction.response.send_message("❌ 身分組不存在", ephemeral=True)
             return
 
-        # ✅ 給已驗證身分組
+        # ✅ 賦予驗證身分組
         await interaction.user.add_roles(role)
 
         # ✅ 移除未驗證身分組
@@ -428,11 +431,7 @@ class 驗證按鈕(discord.ui.View):
             if unverified_role and unverified_role in interaction.user.roles:
                 await interaction.user.remove_roles(unverified_role)
 
-        # ✅ 回覆
-        await interaction.response.send_message(
-            f"✅ 驗證成功！歡迎 {interaction.user.mention} 🎉",
-            ephemeral=True
-        )
+        await interaction.response.send_message(f"✅ 驗證成功！歡迎 {interaction.user.mention} 🎉", ephemeral=True)
 
 @bot.tree.command(name="發送驗證", description="發送驗證按鈕")
 @app_commands.check(is_owner)
@@ -450,30 +449,22 @@ async def 發送驗證(interaction: discord.Interaction):
     await channel.send(embed=embed, view=驗證按鈕())
     await interaction.response.send_message("✅ 已發送驗證訊息", ephemeral=True)
 
-@bot.tree.command(name="設置未驗證身分組", description="設定未驗證角色（驗證後會移除）")
-@app_commands.check(is_owner)
-async def 設置未驗證身分組(interaction: discord.Interaction, 身分組: discord.Role):
-    data = load_data()
-    data["未驗證身分組"] = 身分組.id
-    save_data(data)
-
-    await interaction.response.send_message(f"✅ 未驗證身分組設為：{身分組.name}", ephemeral=True)
-
 # ----------------------------
-# 客服 & 工單系統
+# 客服與工單系統
 # ----------------------------
 @bot.tree.command(name="設置客服身分組", description="設定客服可查看工單")
 @app_commands.check(is_owner)
+@app_commands.describe(身分組="客服身分組")
 async def 設置客服身分組(interaction: discord.Interaction, 身分組: discord.Role):
     data = load_data()
     data["客服身分組"] = 身分組.id
     save_data(data)
     await interaction.response.send_message(f"✅ 客服身分組設為：{身分組.name}", ephemeral=True)
 
-
 class 工單按鈕(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+
     @discord.ui.button(label="🎫 開啟工單", style=discord.ButtonStyle.green)
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
@@ -481,22 +472,27 @@ class 工單按鈕(discord.ui.View):
         if uid in data["工單紀錄"]:
             await interaction.response.send_message("❌ 你已經有工單了！", ephemeral=True)
             return
+
         guild = interaction.guild
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
+
         role_id = data.get("客服身分組")
         if role_id:
             role = guild.get_role(role_id)
             if role:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-        channel = await guild.create_text_channel(name=f"ticket-{interaction.user.name}", overwrites=overwrites)
+
+        channel = await guild.create_text_channel(
+            name=f"ticket-{interaction.user.name}",
+            overwrites=overwrites
+        )
         data["工單紀錄"][uid] = channel.id
         save_data(data)
         await channel.send(f"{interaction.user.mention} 🎫 工單已建立，請描述你的問題")
         await interaction.response.send_message(f"✅ 工單已建立：{channel.mention}", ephemeral=True)
-
 
 @bot.tree.command(name="發送工單", description="發送工單按鈕")
 @app_commands.check(is_owner)
@@ -504,7 +500,6 @@ async def 發送工單(interaction: discord.Interaction):
     embed = discord.Embed(title="🎫 客服系統", description="點擊下方按鈕建立工單", color=0x00ff99)
     await interaction.channel.send(embed=embed, view=工單按鈕())
     await interaction.response.send_message("✅ 已發送工單按鈕", ephemeral=True)
-
 
 @bot.tree.command(name="關閉工單", description="關閉此工單")
 @app_commands.checks.has_permissions(manage_channels=True)
@@ -524,7 +519,6 @@ async def 關閉工單(interaction: discord.Interaction):
     await interaction.response.send_message("🗑️ 工單已關閉")
     await interaction.channel.delete()
 
-
 @bot.tree.command(name="加入人員", description="加入人員到工單")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def 加入人員(interaction: discord.Interaction, 成員: discord.Member):
@@ -536,13 +530,27 @@ async def 加入人員(interaction: discord.Interaction, 成員: discord.Member)
 async def 移除人員(interaction: discord.Interaction, 成員: discord.Member):
     await interaction.channel.set_permissions(成員, overwrite=None)
     await interaction.response.send_message(f"✅ 已移除 {成員.mention}")
+
+# ----------------------------
+# 成員加入自動賦予身分組
+# ----------------------------
+@bot.event
+async def on_member_join(member: discord.Member):
+    data = load_data()
+    role_id = data.get("驗證身分組")  # 自動賦予驗證身分組
+    if role_id:
+        role = member.guild.get_role(role_id)
+        if role:
+            await member.add_roles(role)
+
 # ----------------------------
 # BOT 啟動事件
 # ----------------------------
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f"Logged in as {bot.user} (五條悟 BOT 已啟動)")
+    每日重置違規.start()
+    print(f"Logged in as {bot.user} (BOT 已啟動)")
 
 # ----------------------------
 # 啟動 BOT
