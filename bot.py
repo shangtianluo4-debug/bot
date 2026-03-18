@@ -25,23 +25,42 @@ def is_developer(interaction: discord.Interaction):
     data = load_data()
     return interaction.user.id in data.get("開發者名單", [])
 
-# ----------------------------
-# 資料管理
-# ----------------------------
 def init_data():
+    default_data = {
+        "黑名單": [],
+        "白名單": [],
+        "開發者名單": [],
+        "日誌頻道": None,
+        "懲罰日誌頻道": None,
+        "驗證身分組": None,
+        "驗證頻道": None,
+        "未驗證身分組": None,  # ✅ 新增
+        "客服身分組": None,
+        "工單分類": None,
+        "工單紀錄": {}
+    }
+
+    # 如果檔案不存在 → 建立
     if not os.path.exists(DATA_FILE):
-        data = {
-            "黑名單": [],
-            "白名單": [],
-            "開發者名單": [],
-            "日誌頻道": None,
-            "懲罰日誌頻道": None,
-            "驗證身分組": None,
-            "驗證頻道": None,
-            "客服身分組": None,
-            "工單分類": None,
-            "工單紀錄": {}
-        }
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, indent=4, ensure_ascii=False)
+        return
+
+    # 如果存在 → 檢查缺少欄位
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        try:
+            data = json.load(f)
+        except:
+            data = {}
+
+    changed = False
+
+    for key, value in default_data.items():
+        if key not in data:
+            data[key] = value
+            changed = True
+
+    if changed:
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
@@ -49,10 +68,6 @@ def load_data():
     init_data()
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
 # ----------------------------
 # AI 偵測文字違規（Hugging Face Inference API）
 # ----------------------------
@@ -388,19 +403,36 @@ async def 設置驗證頻道(interaction: discord.Interaction, 頻道: discord.T
 class 驗證按鈕(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+
     @discord.ui.button(label="點我驗證", style=discord.ButtonStyle.green)
     async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         role_id = data.get("驗證身分組")
+
         if not role_id:
             await interaction.response.send_message("❌ 尚未設置驗證身分組", ephemeral=True)
             return
+
         role = interaction.guild.get_role(role_id)
         if not role:
             await interaction.response.send_message("❌ 身分組不存在", ephemeral=True)
             return
+
+        # ✅ 給已驗證身分組
         await interaction.user.add_roles(role)
-        await interaction.response.send_message("✅ 驗證成功！", ephemeral=True)
+
+        # ✅ 移除未驗證身分組
+        unverified_id = data.get("未驗證身分組")
+        if unverified_id:
+            unverified_role = interaction.guild.get_role(unverified_id)
+            if unverified_role and unverified_role in interaction.user.roles:
+                await interaction.user.remove_roles(unverified_role)
+
+        # ✅ 回覆
+        await interaction.response.send_message(
+            f"✅ 驗證成功！歡迎 {interaction.user.mention} 🎉",
+            ephemeral=True
+        )
 
 @bot.tree.command(name="發送驗證", description="發送驗證按鈕")
 @app_commands.check(is_owner)
@@ -418,6 +450,14 @@ async def 發送驗證(interaction: discord.Interaction):
     await channel.send(embed=embed, view=驗證按鈕())
     await interaction.response.send_message("✅ 已發送驗證訊息", ephemeral=True)
 
+@bot.tree.command(name="設置未驗證身分組", description="設定未驗證角色（驗證後會移除）")
+@app_commands.check(is_owner)
+async def 設置未驗證身分組(interaction: discord.Interaction, 身分組: discord.Role):
+    data = load_data()
+    data["未驗證身分組"] = 身分組.id
+    save_data(data)
+
+    await interaction.response.send_message(f"✅ 未驗證身分組設為：{身分組.name}", ephemeral=True)
 
 # ----------------------------
 # 客服 & 工單系統
