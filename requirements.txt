@@ -1,4 +1,4 @@
 discord.py
+aiosqlite
+psutil
 python-dotenv
-aiohttp
-flask
